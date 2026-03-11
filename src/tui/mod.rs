@@ -594,8 +594,8 @@ fn render_color_bank(
     buffer: Option<&[u8]>,
     _device_buffer: Option<&[u8]>,
     bank: usize,
-    _target: ColorTarget,
-    _state: &AppState,
+    target: ColorTarget,
+    state: &AppState,
 ) {
     let Some(buffer) = buffer else {
         render_text_section(frame, area, title, vec![Line::from("Buffer pending.")], true, false);
@@ -616,11 +616,19 @@ fn render_color_bank(
                     let image_index = bank * 64 + row * 8 + col;
                     let button_index = MF64_IMAGE_TO_BUTTON_ID[image_index];
                     let color = color_for_button(buffer, button_index);
+                    let is_active_layer = state.selected_color_target == target;
+                    let is_cursor = is_active_layer && state.selected_pad_button_idx == button_index;
+                    let is_selected = is_active_layer && state.selected_pad_buttons.contains(&button_index);
+                    let marker_style = match (is_cursor, is_selected) {
+                        (true, true) => theme::selected(),
+                        (true, false) => theme::selected(),
+                        (false, true) => Style::default().bg(Color::Gray),
+                        (false, false) => Style::default(),
+                    };
                     [
-                        Span::styled(
-                            "   ",
-                            Style::default().bg(color),
-                        ),
+                        Span::styled(" ", marker_style),
+                        Span::styled("   ", Style::default().bg(color)),
+                        Span::styled(" ", marker_style),
                         Span::raw(" "),
                     ]
                 })
