@@ -130,7 +130,6 @@ pub fn connect_selected<T: MidiTransport>(
     state.staged_edits.clear();
     state.packet_log.clear();
     state.selected_setting_idx = 0;
-    state.selected_raw_tag_idx = 0;
     state.selected_packet_idx = 0;
     state.app_mode = AppMode::ReadingConfig;
     state.screen = Screen::Settings;

@@ -74,17 +74,15 @@ pub enum Screen {
     Devices,
     Settings,
     PadColors,
-    RawTags,
     PacketLog,
     ImportExport,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 6] = [
+    pub const ALL: [Screen; 5] = [
         Screen::Devices,
         Screen::Settings,
         Screen::PadColors,
-        Screen::RawTags,
         Screen::PacketLog,
         Screen::ImportExport,
     ];
@@ -94,7 +92,6 @@ impl Screen {
             Screen::Devices => "Devices",
             Screen::Settings => "Settings",
             Screen::PadColors => "Pad Colors",
-            Screen::RawTags => "Raw Tags",
             Screen::PacketLog => "Packet Log",
             Screen::ImportExport => "Import/Export",
         }
@@ -154,7 +151,6 @@ pub struct AppState {
     pub devices: Vec<DeviceRef>,
     pub selected_device_idx: usize,
     pub selected_setting_idx: usize,
-    pub selected_raw_tag_idx: usize,
     pub selected_packet_idx: usize,
     pub connected_device_id: Option<String>,
     pub snapshot: Option<ConfigSnapshot>,
@@ -183,7 +179,6 @@ impl AppState {
             devices: Vec::new(),
             selected_device_idx: 0,
             selected_setting_idx: 0,
-            selected_raw_tag_idx: 0,
             selected_packet_idx: 0,
             connected_device_id: None,
             snapshot: None,
@@ -222,19 +217,6 @@ impl AppState {
         self.snapshot
             .as_ref()
             .map(|snapshot| snapshot.fields.iter().filter(|field| field.known).collect())
-            .unwrap_or_default()
-    }
-
-    pub fn unknown_fields(&self) -> Vec<&DecodedField> {
-        self.snapshot
-            .as_ref()
-            .map(|snapshot| {
-                snapshot
-                    .fields
-                    .iter()
-                    .filter(|field| !field.known)
-                    .collect()
-            })
             .unwrap_or_default()
     }
 
@@ -310,15 +292,6 @@ impl AppState {
             .unwrap_or(0);
         if self.selected_setting_idx >= known_len && known_len > 0 {
             self.selected_setting_idx = known_len - 1;
-        }
-
-        let unknown_len = self
-            .snapshot
-            .as_ref()
-            .map(|snapshot| snapshot.fields.iter().filter(|field| !field.known).count())
-            .unwrap_or(0);
-        if self.selected_raw_tag_idx >= unknown_len && unknown_len > 0 {
-            self.selected_raw_tag_idx = unknown_len - 1;
         }
 
         if self.selected_packet_idx >= self.packet_log.len() && !self.packet_log.is_empty() {

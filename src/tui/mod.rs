@@ -85,7 +85,6 @@ fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
         Screen::Devices => render_devices_screen(frame, area, state),
         Screen::Settings => render_settings_screen(frame, area, state),
         Screen::PadColors => render_pad_colors_screen(frame, area, state),
-        Screen::RawTags => render_raw_tags_screen(frame, area, state),
         Screen::PacketLog => render_packet_log_screen(frame, area, state),
         Screen::ImportExport => render_import_export_screen(frame, area, state),
     }
@@ -227,47 +226,6 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     };
 
     render_text_section(frame, sections[1], "Setting Detail", detail, true, true);
-}
-
-fn render_raw_tags_screen(frame: &mut Frame, area: Rect, state: &AppState) {
-    let sections = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(12)])
-        .split(area);
-
-    let unknown_fields = state.unknown_fields();
-    let items = if unknown_fields.is_empty() {
-        vec![ListItem::new("No unknown tags in the current snapshot.")]
-    } else {
-        unknown_fields
-            .iter()
-            .enumerate()
-            .map(|(index, field)| {
-                let style = if index == state.selected_raw_tag_idx {
-                    theme::selected()
-                } else {
-                    Style::default()
-                };
-                ListItem::new(Line::from(Span::styled(
-                    format!("{}: {}", field.tag_id, field.value),
-                    style,
-                )))
-            })
-            .collect()
-    };
-
-    frame.render_widget(
-        List::new(items).block(themed_block("Unknown Tags")),
-        sections[0],
-    );
-
-    let detail = state
-        .unknown_fields()
-        .get(state.selected_raw_tag_idx)
-        .map(|field| field_detail_lines(field, &field.value, false))
-        .unwrap_or_else(|| vec![Line::from("Unknown tag registry is empty.")]);
-
-    render_text_section(frame, sections[1], "Tag Detail", detail, true, true);
 }
 
 fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {

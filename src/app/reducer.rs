@@ -78,7 +78,6 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::Devices => state.devices.len(),
         Screen::Settings => state.known_fields().len(),
         Screen::PadColors => 0,
-        Screen::RawTags => state.unknown_fields().len(),
         Screen::PacketLog => state.packet_log.len(),
         Screen::ImportExport => 0,
     };
@@ -87,7 +86,6 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::Devices => &mut state.selected_device_idx,
         Screen::Settings => &mut state.selected_setting_idx,
         Screen::PadColors => return,
-        Screen::RawTags => &mut state.selected_raw_tag_idx,
         Screen::PacketLog => &mut state.selected_packet_idx,
         Screen::ImportExport => return,
     };
