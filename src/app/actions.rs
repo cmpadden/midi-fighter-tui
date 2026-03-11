@@ -8,6 +8,7 @@ pub enum Action {
     MoveRight,
     MoveUp,
     MoveDown,
+    ExtendPadSelection(isize, isize),
     AdjustSelected(i32),
     ActivateSelected,
     RefreshDevices,

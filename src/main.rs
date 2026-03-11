@@ -89,6 +89,30 @@ fn map_key(key: KeyEvent, state: &app::AppState) -> Option<Action> {
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::Tab => Some(Action::NextScreen),
         KeyCode::BackTab => Some(Action::PrevScreen),
+        KeyCode::Left
+            if matches!(state.screen, Screen::PadColors)
+                && key.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Action::ExtendPadSelection(-1, 0))
+        }
+        KeyCode::Right
+            if matches!(state.screen, Screen::PadColors)
+                && key.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Action::ExtendPadSelection(1, 0))
+        }
+        KeyCode::Up
+            if matches!(state.screen, Screen::PadColors)
+                && key.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Action::ExtendPadSelection(0, -1))
+        }
+        KeyCode::Down
+            if matches!(state.screen, Screen::PadColors)
+                && key.modifiers.contains(KeyModifiers::SHIFT) =>
+        {
+            Some(Action::ExtendPadSelection(0, 1))
+        }
         KeyCode::Left if matches!(state.screen, Screen::PadColors) => Some(Action::MoveLeft),
         KeyCode::Right if matches!(state.screen, Screen::PadColors) => Some(Action::MoveRight),
         KeyCode::Up => Some(Action::MoveUp),

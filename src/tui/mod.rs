@@ -42,7 +42,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|device| device.name.as_str())
         .unwrap_or("none");
     let key_hint = if matches!(state.screen, Screen::PadColors) {
-        "<tab> sections <q> quit <r> scan <g> read <p> activity <?> help <arrows> move <b> bank <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> activity <?> help <arrows> move <shift+arrows> sweep <b> bank <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
     } else {
         "<tab> sections <q> quit <r> scan <g> read <p> activity <?> help <up/down> move <left/right> edit <enter> select <a> apply"
     };
@@ -371,9 +371,7 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .height
         .saturating_sub(min_detail_height + min_activity_height)
         .max(4);
-    let packet_list_height = (items.len() as u16 + 2)
-        .max(4)
-        .min(max_packet_list_height);
+    let packet_list_height = (items.len() as u16 + 2).max(4).min(max_packet_list_height);
 
     let events = if state.event_log.is_empty() {
         vec![ListItem::new("No activity recorded yet.")]
@@ -462,6 +460,7 @@ fn render_help_modal(frame: &mut Frame) {
         Line::from(""),
         Line::from("Pad color workflow"),
         Line::from("  Arrow keys  move the pad cursor across the active 8x8 bank"),
+        Line::from("  Shift+Arrows extend selection while moving"),
         Line::from("  b           toggle between bank 1 and bank 2"),
         Line::from("  Space       toggle the current pad into the active selection"),
         Line::from("  x           clear the active pad selection"),

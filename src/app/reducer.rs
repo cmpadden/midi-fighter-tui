@@ -29,6 +29,7 @@ pub fn reduce(state: &mut AppState, action: Action) {
         Action::MoveRight => move_horizontal(state, 1),
         Action::MoveUp => move_selection(state, -1),
         Action::MoveDown => move_selection(state, 1),
+        Action::ExtendPadSelection(dx, dy) => extend_pad_selection(state, dx, dy),
         Action::AdjustSelected(delta) => stage_adjustment(state, delta),
         Action::ActivateSelected => activate_selected(state),
         Action::ShowPacketLog => state.screen = Screen::PacketLog,
@@ -379,6 +380,24 @@ fn clear_pad_selection(state: &mut AppState) {
 
     state.selected_pad_buttons.clear();
     state.set_status("Cleared pad selection.");
+}
+
+fn extend_pad_selection(state: &mut AppState, dx: isize, dy: isize) {
+    if !matches!(state.screen, Screen::PadColors) {
+        return;
+    }
+
+    state
+        .selected_pad_buttons
+        .insert(state.selected_pad_button_idx);
+    move_pad_cursor(state, dx, dy);
+    state
+        .selected_pad_buttons
+        .insert(state.selected_pad_button_idx);
+    state.set_status(format!(
+        "Selected {} pad(s) for bulk color edits.",
+        state.selected_pad_buttons.len()
+    ));
 }
 
 fn toggle_pad_bank(state: &mut AppState) {
