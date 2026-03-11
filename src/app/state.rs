@@ -152,6 +152,7 @@ pub struct AppState {
     pub selected_device_idx: usize,
     pub selected_setting_idx: usize,
     pub selected_packet_idx: usize,
+    pub connected_device: Option<DeviceRef>,
     pub connected_device_id: Option<String>,
     pub snapshot: Option<ConfigSnapshot>,
     pub pad_colors: Option<PadColorSnapshot>,
@@ -181,6 +182,7 @@ impl AppState {
             selected_device_idx: 0,
             selected_setting_idx: 0,
             selected_packet_idx: 0,
+            connected_device: None,
             connected_device_id: None,
             snapshot: None,
             pad_colors: None,
@@ -209,10 +211,7 @@ impl AppState {
     }
 
     pub fn connected_device(&self) -> Option<&DeviceRef> {
-        let connected_id = self.connected_device_id.as_ref()?;
-        self.devices
-            .iter()
-            .find(|device| &device.id == connected_id)
+        self.connected_device.as_ref()
     }
 
     pub fn known_fields(&self) -> Vec<&DecodedField> {
@@ -282,6 +281,26 @@ impl AppState {
         self.last_error = None;
     }
 
+    pub fn reset_pad_state(&mut self) {
+        self.pad_colors = None;
+        self.staged_pad_colors = None;
+        self.selected_pad_bank = 0;
+        self.selected_pad_button_idx = 0;
+        self.selected_pad_buttons.clear();
+        self.pending_bulk_reads.clear();
+        self.pad_color_reads_requested = false;
+    }
+
+    pub fn clear_connection_state(&mut self) {
+        self.snapshot = None;
+        self.reset_pad_state();
+        self.staged_edits.clear();
+        self.packet_log.clear();
+        self.selected_setting_idx = 0;
+        self.selected_packet_idx = 0;
+        self.apply_modal_open = false;
+    }
+
     pub fn normalize_selection(&mut self) {
         if self.selected_device_idx >= self.devices.len() && !self.devices.is_empty() {
             self.selected_device_idx = self.devices.len() - 1;
@@ -304,10 +323,12 @@ impl AppState {
         self.selected_pad_buttons.retain(|index| *index < 128);
     }
 
-    pub fn set_connected_device(&mut self, device_id: Option<String>) {
-        self.connected_device_id = device_id.clone();
+    pub fn set_connected_device(&mut self, device: Option<DeviceRef>) {
+        self.connected_device_id = device.as_ref().map(|current| current.id.clone());
+        self.connected_device = device;
+
         for device in &mut self.devices {
-            device.connection_state = match device_id.as_ref() {
+            device.connection_state = match self.connected_device_id.as_ref() {
                 Some(current) if *current == device.id => ConnectionState::Connected,
                 _ => ConnectionState::Disconnected,
             };

@@ -303,8 +303,12 @@ fn decode_bulk_transfer_chunk_raw(raw: &[u8]) -> Option<BulkTransferChunk> {
         || raw.last() != Some(&0xF7)
         || raw[1..4] != [0x00, 0x01, 0x79]
         || raw[4] != 0x04
-        || raw[5] != 0x00
     {
+        return None;
+    }
+
+    let subtype = raw[5];
+    if !matches!(subtype, 0x00 | 0x02) {
         return None;
     }
 
@@ -485,3 +489,40 @@ static MF64_SETTINGS: &[SettingDefinition] = &[
         notes: "Recovered from the official Midi Fighter 64 plugin registry.",
     },
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::decode_bulk_transfer_chunk_raw;
+
+    #[test]
+    fn decodes_bulk_transfer_response_chunks() {
+        let chunk = decode_bulk_transfer_chunk_raw(&[
+            0xF0, 0x00, 0x01, 0x79, 0x04, 0x02, 0x01, 0x01, 0x02, 0x03, 0x10, 0x20, 0x30, 0xF7,
+        ])
+        .expect("bulk transfer response should decode");
+
+        assert_eq!(chunk.tag, 0x01);
+        assert_eq!(chunk.chunk_index, 0x01);
+        assert_eq!(chunk.total_chunks, 0x02);
+        assert_eq!(chunk.data, vec![0x10, 0x20, 0x30]);
+    }
+
+    #[test]
+    fn decodes_legacy_bulk_transfer_chunks() {
+        let chunk = decode_bulk_transfer_chunk_raw(&[
+            0xF0, 0x00, 0x01, 0x79, 0x04, 0x00, 0x01, 0x01, 0x01, 0x01, 0x10, 0xF7,
+        ])
+        .expect("legacy bulk transfer chunk should decode");
+
+        assert_eq!(chunk.tag, 0x01);
+        assert_eq!(chunk.data, vec![0x10]);
+    }
+
+    #[test]
+    fn ignores_unknown_bulk_transfer_subtypes() {
+        assert!(decode_bulk_transfer_chunk_raw(&[
+            0xF0, 0x00, 0x01, 0x79, 0x04, 0x7F, 0x01, 0x01, 0x01, 0x01, 0x10, 0xF7,
+        ])
+        .is_none());
+    }
+}

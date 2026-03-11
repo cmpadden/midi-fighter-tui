@@ -1,15 +1,9 @@
 use crate::protocol::{DecodedField, FieldValue};
 
+use super::pad_grid::{
+    bank_slot_for_button, button_for_bank_slot, move_button_within_bank, BANK_COUNT,
+};
 use super::{Action, AppMode, AppState, ColorTarget, Screen};
-
-const MF64_IMAGE_TO_BUTTON_ID: [usize; 128] = [
-    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54, 55,
-    16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42, 43,
-    4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126, 127, 88,
-    89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83, 112, 113,
-    114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107, 68, 69, 70,
-    71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
-];
 
 pub fn reduce(state: &mut AppState, action: Action) {
     match action {
@@ -405,14 +399,10 @@ fn toggle_pad_bank(state: &mut AppState) {
         return;
     }
 
-    let image_index = MF64_IMAGE_TO_BUTTON_ID
-        .iter()
-        .position(|button| *button == state.selected_pad_button_idx)
-        .unwrap_or(0);
-    let slot = image_index % 64;
+    let slot = bank_slot_for_button(state.selected_pad_button_idx);
 
-    state.selected_pad_bank = (state.selected_pad_bank + 1) % 2;
-    state.selected_pad_button_idx = MF64_IMAGE_TO_BUTTON_ID[state.selected_pad_bank * 64 + slot];
+    state.selected_pad_bank = (state.selected_pad_bank + 1) % BANK_COUNT;
+    state.selected_pad_button_idx = button_for_bank_slot(state.selected_pad_bank, slot);
     state.selected_pad_buttons.clear();
     state.set_status(format!(
         "Switched to pad color bank {}.",
@@ -433,18 +423,12 @@ fn targeted_pad_buttons(state: &AppState) -> Vec<usize> {
 }
 
 fn move_pad_cursor(state: &mut AppState, dx: isize, dy: isize) {
-    let image_index = MF64_IMAGE_TO_BUTTON_ID
-        .iter()
-        .position(|button| *button == state.selected_pad_button_idx)
-        .unwrap_or(0);
-    let bank_offset = state.selected_pad_bank * 64;
-    let bank_image_index = image_index.saturating_sub(bank_offset).min(63);
-    let row = bank_image_index / 8;
-    let col = image_index % 8;
-    let next_row = (row as isize + dy).clamp(0, 7) as usize;
-    let next_col = (col as isize + dx).clamp(0, 7) as usize;
-    let next_image_index = bank_offset + next_row * 8 + next_col;
-    state.selected_pad_button_idx = MF64_IMAGE_TO_BUTTON_ID[next_image_index];
+    state.selected_pad_button_idx = move_button_within_bank(
+        state.selected_pad_button_idx,
+        state.selected_pad_bank,
+        dx,
+        dy,
+    );
 }
 
 fn sync_mode(state: &mut AppState) {

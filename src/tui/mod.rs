@@ -8,20 +8,13 @@ use ratatui::{
 };
 
 use crate::{
-    app::{AppState, ColorTarget, Screen},
-    protocol::{
-        build_bulk_write_messages, build_write_messages, DecodedField, FieldValue, SysexFrame,
+    app::{
+        apply::build_apply_messages,
+        pad_grid::{bank_slot_for_button, button_for_image_index},
+        AppState, ColorTarget, Screen,
     },
+    protocol::{DecodedField, FieldValue, SysexFrame},
 };
-
-const MF64_IMAGE_TO_BUTTON_ID: [usize; 128] = [
-    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54, 55,
-    16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42, 43,
-    4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126, 127, 88,
-    89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83, 112, 113,
-    114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107, 68, 69, 70,
-    71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
-];
 
 pub fn render(frame: &mut Frame, state: &AppState) {
     let areas = layout::split(frame.area());
@@ -258,12 +251,8 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .constraints([Constraint::Length(8), Constraint::Min(0)])
         .split(area);
 
-    let selected_image_index = MF64_IMAGE_TO_BUTTON_ID
-        .iter()
-        .position(|button| *button == state.selected_pad_button_idx)
-        .unwrap_or(0);
     let selected_bank = state.selected_pad_bank + 1;
-    let selected_pad_in_bank = selected_image_index % 64;
+    let selected_pad_in_bank = bank_slot_for_button(state.selected_pad_button_idx);
     let selected_rgb = match state.selected_color_target {
         ColorTarget::Inactive => rgb_for_button(
             pad_colors.inactive.as_deref(),
@@ -481,7 +470,7 @@ fn render_apply_modal(frame: &mut Frame, state: &AppState) {
     let area = centered_rect(frame.area(), 72, 60);
     frame.render_widget(Clear, area);
 
-    let preview_frames = preview_apply_frames(state);
+    let preview_frames = build_apply_messages(state);
 
     let mut lines = vec![
         Line::from(Span::styled(
@@ -625,7 +614,7 @@ fn render_color_bank(
                 let spans = (0..8)
                     .flat_map(|col| {
                         let image_index = bank * 64 + row * 8 + col;
-                        let button_index = MF64_IMAGE_TO_BUTTON_ID[image_index];
+                        let button_index = button_for_image_index(image_index);
                         let color = color_for_button(buffer, button_index);
                         let is_active_layer = state.selected_color_target == target;
                         let is_cursor =
@@ -695,44 +684,6 @@ fn selected_pad_summary(state: &AppState) -> String {
     } else {
         summary
     }
-}
-
-fn preview_apply_frames(
-    state: &AppState,
-) -> Option<Result<Vec<Vec<u8>>, crate::protocol::ProtocolError>> {
-    let snapshot = state.snapshot.as_ref()?;
-    let mut frames = Vec::new();
-
-    if !state.staged_edits.is_empty() {
-        match build_write_messages(snapshot, &state.staged_edits) {
-            Ok(messages) => frames.extend(messages),
-            Err(err) => return Some(Err(err)),
-        }
-    }
-
-    if let (Some(device_colors), Some(staged_colors)) =
-        (state.pad_colors.as_ref(), state.staged_pad_colors.as_ref())
-    {
-        let mut writes = Vec::new();
-        if staged_colors.inactive != device_colors.inactive {
-            if let Some(buffer) = staged_colors.inactive.as_deref() {
-                writes.push((1u8, buffer));
-            }
-        }
-        if staged_colors.active != device_colors.active {
-            if let Some(buffer) = staged_colors.active.as_deref() {
-                writes.push((2u8, buffer));
-            }
-        }
-        if !writes.is_empty() {
-            match build_bulk_write_messages(&snapshot.family, &writes) {
-                Ok(messages) => frames.extend(messages),
-                Err(err) => return Some(Err(err)),
-            }
-        }
-    }
-
-    Some(Ok(frames))
 }
 
 fn themed_block<'a>(title: &'a str) -> Block<'a> {

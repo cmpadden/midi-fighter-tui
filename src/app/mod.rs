@@ -1,5 +1,7 @@
 mod actions;
+pub(crate) mod apply;
 mod commands;
+pub(crate) mod pad_grid;
 mod reducer;
 mod state;
 
@@ -22,6 +24,21 @@ impl<T: MidiTransport> App<T> {
     }
 
     pub fn dispatch(&mut self, action: Action) {
+        if self.state.help_modal_open
+            && !matches!(action, Action::Tick | Action::CancelModal | Action::Quit)
+        {
+            return;
+        }
+
+        if self.state.apply_modal_open
+            && !matches!(
+                action,
+                Action::Tick | Action::ConfirmApply | Action::CancelModal | Action::Quit
+            )
+        {
+            return;
+        }
+
         match action {
             Action::Tick => {
                 reducer::reduce(&mut self.state, action);
@@ -68,5 +85,64 @@ impl<T: MidiTransport> App<T> {
 
     pub fn refresh_devices(&mut self) {
         self.dispatch(Action::RefreshDevices);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        protocol::SysexFrame,
+        transport::{DeviceRef, MidiTransport, TransportError},
+    };
+
+    use super::{Action, App, Screen};
+
+    #[derive(Default)]
+    struct MockTransport {
+        scan_calls: usize,
+    }
+
+    impl MidiTransport for MockTransport {
+        fn scan_devices(&mut self) -> Result<Vec<DeviceRef>, TransportError> {
+            self.scan_calls += 1;
+            Ok(Vec::new())
+        }
+
+        fn connect(&mut self, _device: &DeviceRef) -> Result<Option<String>, TransportError> {
+            Ok(None)
+        }
+
+        fn disconnect(&mut self) -> Result<(), TransportError> {
+            Ok(())
+        }
+
+        fn poll_packets(&mut self) -> Result<Vec<SysexFrame>, TransportError> {
+            Ok(Vec::new())
+        }
+
+        fn send(&mut self, _bytes: &[u8]) -> Result<SysexFrame, TransportError> {
+            Err(TransportError::NotConnected)
+        }
+    }
+
+    #[test]
+    fn apply_modal_blocks_command_dispatch() {
+        let mut app = App::new(MockTransport::default());
+        app.state.apply_modal_open = true;
+
+        app.dispatch(Action::RefreshDevices);
+
+        assert_eq!(app.transport.scan_calls, 0);
+    }
+
+    #[test]
+    fn apply_modal_still_allows_cancel() {
+        let mut app = App::new(MockTransport::default());
+        app.state.apply_modal_open = true;
+        app.state.screen = Screen::Settings;
+
+        app.dispatch(Action::CancelModal);
+
+        assert!(!app.state.apply_modal_open);
     }
 }

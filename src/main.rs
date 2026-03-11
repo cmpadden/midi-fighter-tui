@@ -85,6 +85,15 @@ fn map_key(key: KeyEvent, state: &app::AppState) -> Option<Action> {
         };
     }
 
+    if state.apply_modal_open {
+        return match key.code {
+            KeyCode::Enter | KeyCode::Char(' ') => Some(Action::ConfirmApply),
+            KeyCode::Esc => Some(Action::CancelModal),
+            KeyCode::Char('q') => Some(Action::Quit),
+            _ => None,
+        };
+    }
+
     match key.code {
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::Tab => Some(Action::NextScreen),

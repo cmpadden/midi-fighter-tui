@@ -1,15 +1,15 @@
 use crate::{
     protocol::{
-        apply_frame_to_snapshot, bank_switch_message, build_bulk_write_messages,
-        build_write_messages, bulk_read_request, config_read_request, decode_bulk_transfer_chunk,
-        device_inquiry_request, empty_snapshot, pad_color_tags, FieldValue, ReadCompleteness,
+        apply_frame_to_snapshot, bank_switch_message, bulk_read_request, config_read_request,
+        decode_bulk_transfer_chunk, device_inquiry_request, empty_snapshot, pad_color_tags,
+        FieldValue, ReadCompleteness,
     },
-    transport::{MidiTransport, TransportError},
+    transport::{DeviceRef, MidiTransport, TransportError},
 };
 
 use std::{collections::BTreeSet, thread, time::Duration};
 
-use super::{AppMode, AppState, Screen};
+use super::{apply, AppMode, AppState, Screen};
 
 pub fn refresh_devices<T: MidiTransport>(
     state: &mut AppState,
@@ -19,15 +19,15 @@ pub fn refresh_devices<T: MidiTransport>(
     state.clear_error();
 
     let previous_devices = state.devices.clone();
-    let previous_id = state.connected_device_id.clone();
+    let previous_connected_device = state.connected_device().cloned();
     let previous_selected_id = state.selected_device().map(|device| device.id.clone());
     let devices = scan_devices_with_retry(transport)?;
 
     if devices.is_empty() && !previous_devices.is_empty() {
         state.devices = previous_devices;
-        state.set_connected_device(previous_id);
+        restore_connected_device(state, previous_connected_device);
         restore_selected_device(state, previous_selected_id.as_deref());
-        state.app_mode = if state.connected_device_id.is_some() {
+        state.app_mode = if state.connected_device().is_some() {
             AppMode::Connected
         } else {
             AppMode::Idle
@@ -42,7 +42,7 @@ pub fn refresh_devices<T: MidiTransport>(
     }
 
     state.devices = devices;
-    state.set_connected_device(previous_id);
+    restore_connected_device(state, previous_connected_device);
     restore_selected_device(state, previous_selected_id.as_deref());
     state.normalize_selection();
 
@@ -51,7 +51,7 @@ pub fn refresh_devices<T: MidiTransport>(
         state.set_status("No Midi Fighter ports detected.");
         state.push_event("Scan completed: no Midi Fighter ports detected.");
     } else {
-        state.app_mode = if state.connected_device_id.is_some() {
+        state.app_mode = if state.connected_device().is_some() {
             AppMode::Connected
         } else {
             AppMode::Idle
@@ -90,6 +90,19 @@ fn scan_devices_with_retry<T: MidiTransport>(
     Ok(devices)
 }
 
+fn restore_connected_device(state: &mut AppState, connected_device: Option<DeviceRef>) {
+    let next_connected_device = connected_device.and_then(|connected_device| {
+        state
+            .devices
+            .iter()
+            .find(|device| device.id == connected_device.id)
+            .cloned()
+            .or(Some(connected_device))
+    });
+
+    state.set_connected_device(next_connected_device);
+}
+
 fn restore_selected_device(state: &mut AppState, selected_id: Option<&str>) {
     let Some(selected_id) = selected_id else {
         return;
@@ -119,21 +132,11 @@ pub fn connect_selected<T: MidiTransport>(
 
     let note = transport.connect(&device)?;
 
-    state.set_connected_device(Some(device.id.clone()));
+    state.clear_connection_state();
+    state.set_connected_device(Some(device.clone()));
     state.snapshot = Some(empty_snapshot(device.family.clone()));
-    state.pad_colors = None;
-    state.staged_pad_colors = None;
-    state.selected_pad_bank = 0;
-    state.selected_pad_button_idx = 0;
-    state.selected_pad_buttons.clear();
-    state.pending_bulk_reads.clear();
-    state.pad_color_reads_requested = false;
-    state.staged_edits.clear();
-    state.packet_log.clear();
-    state.selected_setting_idx = 0;
-    state.selected_packet_idx = 0;
     state.app_mode = AppMode::ReadingConfig;
-    state.screen = Screen::Settings;
+    state.screen = Screen::Devices;
     state.set_status(format!(
         "Connected to {}. Requesting device settings...",
         device.name
@@ -182,18 +185,8 @@ pub fn disconnect<T: MidiTransport>(
         .map(|device| device.name.clone())
         .unwrap_or_else(|| "device".to_string());
 
+    state.clear_connection_state();
     state.set_connected_device(None);
-    state.snapshot = None;
-    state.pad_colors = None;
-    state.staged_pad_colors = None;
-    state.selected_pad_bank = 0;
-    state.selected_pad_button_idx = 0;
-    state.selected_pad_buttons.clear();
-    state.pending_bulk_reads.clear();
-    state.pad_color_reads_requested = false;
-    state.staged_edits.clear();
-    state.packet_log.clear();
-    state.apply_modal_open = false;
     state.app_mode = AppMode::Idle;
     state.set_status("Disconnected.");
     state.push_event(format!("Disconnected from {disconnected}."));
@@ -213,13 +206,7 @@ pub fn refresh_config<T: MidiTransport>(
     state.clear_error();
     state.app_mode = AppMode::ReadingConfig;
     state.set_status(format!("Refreshing config from {}...", device.name));
-    state.pad_colors = None;
-    state.staged_pad_colors = None;
-    state.selected_pad_bank = 0;
-    state.selected_pad_button_idx = 0;
-    state.selected_pad_buttons.clear();
-    state.pending_bulk_reads.clear();
-    state.pad_color_reads_requested = false;
+    state.reset_pad_state();
 
     match config_read_request(&device.family) {
         Ok(request) => {
@@ -257,51 +244,20 @@ pub fn confirm_apply<T: MidiTransport>(
     }
 
     state.app_mode = AppMode::ApplyingChanges;
-    let mut messages = Vec::new();
-
-    if let Some(snapshot) = state.snapshot.as_ref() {
-        if !state.staged_edits.is_empty() {
-            let setting_messages = match build_write_messages(snapshot, &state.staged_edits) {
-                Ok(messages) => messages,
-                Err(err) => {
-                    state.app_mode = AppMode::Connected;
-                    state.set_status(err.to_string());
-                    state.push_event(format!("Apply unavailable: {err}"));
-                    return Ok(());
-                }
-            };
-            messages.extend(setting_messages);
+    let Some(messages) = apply::build_apply_messages(state) else {
+        state.app_mode = AppMode::Connected;
+        state.set_status("No config snapshot loaded.");
+        return Ok(());
+    };
+    let messages = match messages {
+        Ok(messages) => messages,
+        Err(err) => {
+            state.app_mode = AppMode::Connected;
+            state.set_status(err.to_string());
+            state.push_event(format!("Apply unavailable: {err}"));
+            return Ok(());
         }
-
-        if let (Some(device_colors), Some(staged_colors)) =
-            (state.pad_colors.as_ref(), state.staged_pad_colors.as_ref())
-        {
-            let mut writes = Vec::new();
-            if staged_colors.inactive != device_colors.inactive {
-                if let Some(buffer) = staged_colors.inactive.as_deref() {
-                    writes.push((1u8, buffer));
-                }
-            }
-            if staged_colors.active != device_colors.active {
-                if let Some(buffer) = staged_colors.active.as_deref() {
-                    writes.push((2u8, buffer));
-                }
-            }
-
-            if !writes.is_empty() {
-                let color_messages = match build_bulk_write_messages(&snapshot.family, &writes) {
-                    Ok(messages) => messages,
-                    Err(err) => {
-                        state.app_mode = AppMode::Connected;
-                        state.set_status(err.to_string());
-                        state.push_event(format!("Apply unavailable: {err}"));
-                        return Ok(());
-                    }
-                };
-                messages.extend(color_messages);
-            }
-        }
-    }
+    };
 
     for message in &messages {
         let frame = transport.send(message)?;
