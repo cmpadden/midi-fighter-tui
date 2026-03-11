@@ -42,20 +42,24 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|device| device.name.as_str())
         .unwrap_or("none");
     let key_hint = if matches!(state.screen, Screen::PadColors) {
-        "tab sections  q quit  r scan  g read  p packet  ? help  arrows move  space mark  enter layer  [/] palette  x clear  u undo  a apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <arrows> move <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
     } else {
-        "tab sections  q quit  r scan  g read  p packet  ? help  up/down move  left/right edit  enter select  a apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <up/down> move <left/right> edit <enter> select <a> apply"
     };
 
     let lines = vec![
-        Line::from(vec![
-            Span::styled("mode:", theme::footer_label()),
-            Span::styled(state.app_mode.label(), theme::footer()),
-            Span::styled("  device:", theme::footer_label()),
-            Span::styled(connected, theme::footer()),
-            Span::styled("  dirty:", theme::footer_label()),
-            Span::styled(state.dirty_count().to_string(), theme::footer()),
-        ]),
+        Line::from({
+            let mut spans = vec![
+                Span::styled("mode:", theme::footer_label()),
+                Span::styled(state.app_mode.label(), theme::footer()),
+                Span::styled("  device:", theme::footer_label()),
+                Span::styled(connected, theme::footer()),
+            ];
+            if state.dirty_count() > 0 {
+                spans.push(Span::styled("  Unapplied Changes", theme::footer_label()));
+            }
+            spans
+        }),
         Line::from(Span::styled(key_hint, theme::footer())),
     ];
 
