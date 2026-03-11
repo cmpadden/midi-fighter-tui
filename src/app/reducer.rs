@@ -16,12 +16,12 @@ pub fn reduce(state: &mut AppState, action: Action) {
         Action::Tick => {}
         Action::Quit => state.should_quit = true,
         Action::NextScreen => {
-            if !state.apply_modal_open {
+            if !state.apply_modal_open && !state.help_modal_open {
                 state.screen = state.screen.next();
             }
         }
         Action::PrevScreen => {
-            if !state.apply_modal_open {
+            if !state.apply_modal_open && !state.help_modal_open {
                 state.screen = state.screen.prev();
             }
         }
@@ -31,7 +31,7 @@ pub fn reduce(state: &mut AppState, action: Action) {
         Action::MoveDown => move_selection(state, 1),
         Action::AdjustSelected(delta) => stage_adjustment(state, delta),
         Action::ActivateSelected => activate_selected(state),
-        Action::TogglePacketPane => state.show_packet_pane = !state.show_packet_pane,
+        Action::ShowPacketLog => state.screen = Screen::PacketLog,
         Action::ToggleApplyModal => {
             if state.dirty_count() > 0 {
                 state.apply_modal_open = !state.apply_modal_open;
@@ -39,7 +39,13 @@ pub fn reduce(state: &mut AppState, action: Action) {
                 state.set_status("No staged changes to apply.");
             }
         }
-        Action::CancelModal => state.apply_modal_open = false,
+        Action::CancelModal => {
+            if state.apply_modal_open {
+                state.apply_modal_open = false;
+            } else if state.help_modal_open {
+                state.help_modal_open = false;
+            }
+        }
         Action::TogglePadSelection => toggle_pad_selection(state),
         Action::ClearPadSelection => clear_pad_selection(state),
         Action::UndoField => undo_current_field(state),
@@ -50,7 +56,7 @@ pub fn reduce(state: &mut AppState, action: Action) {
             state.set_status("Discarded all staged edits.");
             state.push_event("Discarded all staged edits.");
         }
-        Action::ShowHelp => state.screen = Screen::Help,
+        Action::ShowHelp => state.help_modal_open = true,
         Action::RefreshDevices
         | Action::ConnectSelected
         | Action::Disconnect
@@ -74,7 +80,7 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::PadColors => 0,
         Screen::RawTags => state.unknown_fields().len(),
         Screen::PacketLog => state.packet_log.len(),
-        Screen::ImportExport | Screen::Help => 0,
+        Screen::ImportExport => 0,
     };
 
     let target = match state.screen {
@@ -83,7 +89,7 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::PadColors => return,
         Screen::RawTags => &mut state.selected_raw_tag_idx,
         Screen::PacketLog => &mut state.selected_packet_idx,
-        Screen::ImportExport | Screen::Help => return,
+        Screen::ImportExport => return,
     };
 
     if max == 0 {
@@ -177,25 +183,25 @@ fn undo_current_field(state: &mut AppState) {
 
 fn stage_pad_color_adjustment(state: &mut AppState, delta: i32) {
     const PALETTE: &[(u8, u8, u8)] = &[
-        (254, 0, 0),
-        (211, 63, 0),
-        (169, 132, 0),
-        (132, 169, 0),
-        (0, 254, 0),
-        (0, 158, 158),
-        (0, 0, 254),
-        (132, 37, 169),
-        (190, 0, 95),
-        (127, 127, 127),
         (127, 0, 0),
         (105, 31, 0),
-        (84, 63, 0),
-        (63, 84, 0),
+        (84, 66, 0),
+        (66, 84, 0),
         (0, 127, 0),
         (0, 79, 79),
         (0, 0, 127),
-        (68, 15, 89),
+        (66, 18, 84),
         (95, 0, 47),
+        (63, 63, 63),
+        (63, 0, 0),
+        (52, 15, 0),
+        (42, 31, 0),
+        (31, 42, 0),
+        (0, 63, 0),
+        (0, 39, 39),
+        (0, 0, 63),
+        (34, 7, 44),
+        (47, 0, 23),
         (0, 0, 0),
     ];
 
@@ -226,9 +232,9 @@ fn stage_pad_color_adjustment(state: &mut AppState, delta: i32) {
     };
 
     let current = (
-        current_bytes[0].saturating_mul(2),
-        current_bytes[1].saturating_mul(2),
-        current_bytes[2].saturating_mul(2),
+        current_bytes[0],
+        current_bytes[1],
+        current_bytes[2],
     );
     let current_index = PALETTE.iter().position(|entry| *entry == current).unwrap_or(0) as i32;
     let next_index = (current_index + delta).rem_euclid(PALETTE.len() as i32) as usize;
@@ -254,9 +260,9 @@ fn stage_pad_color_adjustment(state: &mut AppState, delta: i32) {
             if start + 2 >= buffer.len() {
                 continue;
             }
-            buffer[start] = next.0 / 2;
-            buffer[start + 1] = next.1 / 2;
-            buffer[start + 2] = next.2 / 2;
+            buffer[start] = next.0;
+            buffer[start + 1] = next.1;
+            buffer[start + 2] = next.2;
         }
     }
 
@@ -276,9 +282,9 @@ fn stage_pad_color_adjustment(state: &mut AppState, delta: i32) {
             "Staged {} color for {} pad(s) = #{:02X}{:02X}{:02X}",
             state.selected_color_target.label(),
             targets.len(),
-            next.0,
-            next.1,
-            next.2
+            next.0.saturating_mul(2),
+            next.1.saturating_mul(2),
+            next.2.saturating_mul(2)
         ));
         state.push_event(format!(
             "staged {} color for {} pad(s)",

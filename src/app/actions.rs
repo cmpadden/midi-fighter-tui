@@ -14,7 +14,7 @@ pub enum Action {
     ConnectSelected,
     Disconnect,
     RefreshConfig,
-    TogglePacketPane,
+    ShowPacketLog,
     ToggleApplyModal,
     ConfirmApply,
     CancelModal,

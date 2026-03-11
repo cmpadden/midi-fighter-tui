@@ -72,18 +72,16 @@ pub enum Screen {
     RawTags,
     PacketLog,
     ImportExport,
-    Help,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 7] = [
+    pub const ALL: [Screen; 6] = [
         Screen::Devices,
         Screen::Settings,
         Screen::PadColors,
         Screen::RawTags,
         Screen::PacketLog,
         Screen::ImportExport,
-        Screen::Help,
     ];
 
     pub fn title(self) -> &'static str {
@@ -94,7 +92,6 @@ impl Screen {
             Screen::RawTags => "Raw Tags",
             Screen::PacketLog => "Packet Log",
             Screen::ImportExport => "Import/Export",
-            Screen::Help => "Help",
         }
     }
 
@@ -143,7 +140,6 @@ impl AppMode {
 pub struct AppState {
     pub screen: Screen,
     pub should_quit: bool,
-    pub show_packet_pane: bool,
     pub devices: Vec<DeviceRef>,
     pub selected_device_idx: usize,
     pub selected_setting_idx: usize,
@@ -165,6 +161,7 @@ pub struct AppState {
     pub last_error: Option<String>,
     pub app_mode: AppMode,
     pub apply_modal_open: bool,
+    pub help_modal_open: bool,
 }
 
 impl AppState {
@@ -172,7 +169,6 @@ impl AppState {
         let mut state = Self {
             screen: Screen::Devices,
             should_quit: false,
-            show_packet_pane: true,
             devices: Vec::new(),
             selected_device_idx: 0,
             selected_setting_idx: 0,
@@ -194,6 +190,7 @@ impl AppState {
             last_error: None,
             app_mode: AppMode::Booting,
             apply_modal_open: false,
+            help_modal_open: false,
         };
         state.push_event("Application booted.");
         state

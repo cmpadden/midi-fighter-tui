@@ -4,7 +4,7 @@ mod theme;
 use ratatui::{
     layout::{Constraint, Direction as LayoutDirection, Layout, Rect},
     prelude::*,
-    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Tabs, Wrap},
 };
 
 use crate::{
@@ -22,17 +22,15 @@ const MF64_IMAGE_TO_BUTTON_ID: [usize; 128] = [
 ];
 
 pub fn render(frame: &mut Frame, state: &AppState) {
-    let areas = layout::split(frame.area(), state.show_packet_pane);
+    let areas = layout::split(frame.area());
+    render_tabs(frame, areas.tabs, state);
     render_status(frame, areas.status, state);
-    render_navigation(frame, areas.nav, state);
     render_main(frame, areas.main, state);
-
-    if let Some(bottom) = areas.bottom {
-        render_bottom_pane(frame, bottom, state);
-    }
 
     if state.apply_modal_open {
         render_apply_modal(frame, state);
+    } else if state.help_modal_open {
+        render_help_modal(frame);
     }
 }
 
@@ -42,40 +40,42 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|device| device.name.as_str())
         .unwrap_or("none");
     let key_hint = if matches!(state.screen, Screen::PadColors) {
-        "keys: tab q r g a p ? [ ]"
+        "tab sections  q quit  r scan  g read  p packet  ? help  arrows move  space mark  enter layer  [/] palette  x clear  u undo  a apply"
     } else {
-        "keys: tab q r g a p ?"
+        "tab sections  q quit  r scan  g read  p packet  ? help  up/down move  left/right edit  enter select  a apply"
     };
 
-    let status = Line::from(vec![
-        Span::styled(
-            format!(" {} ", state.screen.title()),
-            theme::accent().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(format!("mode:{} ", state.app_mode.label())),
-        Span::raw(format!("device:{} ", connected)),
-        Span::raw(format!("dirty:{} ", state.dirty_count())),
-        Span::raw(key_hint),
-    ]);
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("mode:", theme::footer_label()),
+            Span::styled(state.app_mode.label(), theme::footer()),
+            Span::styled("  device:", theme::footer_label()),
+            Span::styled(connected, theme::footer()),
+            Span::styled("  dirty:", theme::footer_label()),
+            Span::styled(state.dirty_count().to_string(), theme::footer()),
+        ]),
+        Line::from(Span::styled(key_hint, theme::footer())),
+    ];
 
-    frame.render_widget(Paragraph::new(status), area);
+    frame.render_widget(Paragraph::new(lines).style(theme::footer()), area);
 }
 
-fn render_navigation(frame: &mut Frame, area: Rect, state: &AppState) {
-    let items = Screen::ALL
+fn render_tabs(frame: &mut Frame, area: Rect, state: &AppState) {
+    let titles = Screen::ALL
         .iter()
-        .map(|screen| {
-            let style = if *screen == state.screen {
-                theme::selected()
-            } else {
-                Style::default()
-            };
-            ListItem::new(Line::from(Span::styled(screen.title(), style)))
-        })
+        .map(|screen| Line::from(screen.title()))
         .collect::<Vec<_>>();
+    let selected = Screen::ALL
+        .iter()
+        .position(|screen| *screen == state.screen)
+        .unwrap_or(0);
 
-    let list = List::new(items).block(themed_block("Sections"));
-    frame.render_widget(list, area);
+    let tabs = Tabs::new(titles)
+        .select(selected)
+        .highlight_style(theme::selected())
+        .divider(" ")
+        .block(themed_block("Sections"));
+    frame.render_widget(tabs, area);
 }
 
 fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -86,14 +86,13 @@ fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
         Screen::RawTags => render_raw_tags_screen(frame, area, state),
         Screen::PacketLog => render_packet_log_screen(frame, area, state),
         Screen::ImportExport => render_import_export_screen(frame, area, state),
-        Screen::Help => render_help_screen(frame, area),
     }
 }
 
 fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let sections = Layout::default()
-        .direction(LayoutDirection::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .direction(LayoutDirection::Vertical)
+        .constraints([Constraint::Length(8), Constraint::Min(0)])
         .split(area);
 
     let device_items = if state.devices.is_empty() {
@@ -147,18 +146,13 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         ]
     };
 
-    frame.render_widget(
-        Paragraph::new(detail_lines)
-            .block(themed_block("Device Detail"))
-            .wrap(Wrap { trim: true }),
-        sections[1],
-    );
+    render_text_section(frame, sections[1], "Device Detail", detail_lines, true, true);
 }
 
 fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let sections = Layout::default()
-        .direction(LayoutDirection::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .direction(LayoutDirection::Vertical)
+        .constraints([Constraint::Min(8), Constraint::Length(12)])
         .split(area);
 
     let known_fields = state.known_fields();
@@ -209,18 +203,13 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         ]
     };
 
-    frame.render_widget(
-        Paragraph::new(detail)
-            .block(themed_block("Setting Detail"))
-            .wrap(Wrap { trim: true }),
-        sections[1],
-    );
+    render_text_section(frame, sections[1], "Setting Detail", detail, true, true);
 }
 
 fn render_raw_tags_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let sections = Layout::default()
-        .direction(LayoutDirection::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .direction(LayoutDirection::Vertical)
+        .constraints([Constraint::Min(8), Constraint::Length(12)])
         .split(area);
 
     let unknown_fields = state.unknown_fields();
@@ -252,12 +241,7 @@ fn render_raw_tags_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|field| field_detail_lines(field, &field.value, false))
         .unwrap_or_else(|| vec![Line::from("Unknown tag registry is empty.")]);
 
-    frame.render_widget(
-        Paragraph::new(detail)
-            .block(themed_block("Tag Detail"))
-            .wrap(Wrap { trim: true }),
-        sections[1],
-    );
+    render_text_section(frame, sections[1], "Tag Detail", detail, true, true);
 }
 
 fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -280,7 +264,7 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let pad_colors = state.current_pad_colors().unwrap_or(device_pad_colors);
     let sections = Layout::default()
         .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Length(7), Constraint::Min(0)])
+        .constraints([Constraint::Length(8), Constraint::Min(0)])
         .split(area);
 
     let selected_image_index = MF64_IMAGE_TO_BUTTON_ID
@@ -315,20 +299,12 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             state.dirty_pad_color_count(),
             state.selected_pad_buttons.len()
         )),
-        Line::from("Keys: Arrow keys move cursor, Space toggle pad in selection, x clear selection"),
-        Line::from("Palette: [ previous color   ] next color"),
-        Line::from("Target: Enter toggles active/inactive, u undoes the current selection"),
         Line::from(format!(
             "Selection detail: {}",
             selected_pad_summary(state)
         )),
     ];
-    frame.render_widget(
-        Paragraph::new(summary)
-            .block(themed_block("Bulk Transfer Status"))
-            .wrap(Wrap { trim: true }),
-        sections[0],
-    );
+    render_text_section(frame, sections[0], "Pad Color Status", summary, true, false);
 
     let grids = Layout::default()
         .direction(LayoutDirection::Horizontal)
@@ -387,8 +363,8 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
 
 fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let sections = Layout::default()
-        .direction(LayoutDirection::Horizontal)
-        .constraints([Constraint::Percentage(45), Constraint::Percentage(55)])
+        .direction(LayoutDirection::Vertical)
+        .constraints([Constraint::Min(8), Constraint::Length(12), Constraint::Length(8)])
         .split(area);
 
     let items = if state.packet_log.is_empty() {
@@ -420,7 +396,7 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(List::new(items).block(themed_block("Packet Log")), sections[0]);
+    frame.render_widget(List::new(items).block(themed_block("Packets")), sections[0]);
 
     let detail = state
         .packet_log
@@ -428,12 +404,19 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(packet_detail_lines)
         .unwrap_or_else(|| vec![Line::from("No packet detail available.")]);
 
-    frame.render_widget(
-        Paragraph::new(detail)
-            .block(themed_block("Packet Detail"))
-            .wrap(Wrap { trim: false }),
-        sections[1],
-    );
+    render_text_section(frame, sections[1], "Packet Detail", detail, false, true);
+
+    let events = if state.event_log.is_empty() {
+        vec![ListItem::new("No activity recorded yet.")]
+    } else {
+        state.event_log
+            .iter()
+            .rev()
+        .take((sections[2].height.saturating_sub(2)) as usize)
+        .map(|line| ListItem::new(line.clone()))
+        .collect::<Vec<_>>()
+    };
+    frame.render_widget(List::new(events).block(themed_block("Activity")), sections[2]);
 }
 
 fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -451,22 +434,20 @@ fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) 
         Line::from("The remaining work is implementing a real file export/import format for decoded snapshots."),
     ];
 
-    frame.render_widget(
-        Paragraph::new(body)
-            .block(themed_block("Import / Export"))
-            .wrap(Wrap { trim: true }),
-        area,
-    );
+    render_text_section(frame, area, "Import / Export", body, true, true);
 }
 
-fn render_help_screen(frame: &mut Frame, area: Rect) {
+fn render_help_modal(frame: &mut Frame) {
+    let area = centered_rect(frame.area(), 72, 70);
+    frame.render_widget(Clear, area);
+
     let body = vec![
         Line::from("Global"),
         Line::from("  q / Ctrl-C  quit"),
         Line::from("  Tab         next section"),
         Line::from("  Shift-Tab   previous section"),
-        Line::from("  p           toggle bottom packet pane"),
-        Line::from("  ?           jump to help"),
+        Line::from("  p           jump to Packet Log"),
+        Line::from("  ? / Esc     close help"),
         Line::from(""),
         Line::from("Device workflow"),
         Line::from("  r           rescan MIDI ports"),
@@ -497,40 +478,6 @@ fn render_help_screen(frame: &mut Frame, area: Rect) {
             .wrap(Wrap { trim: true }),
         area,
     );
-}
-
-fn render_bottom_pane(frame: &mut Frame, area: Rect, state: &AppState) {
-    let sections = Layout::default()
-        .direction(LayoutDirection::Horizontal)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(area);
-
-    let events = state
-        .event_log
-        .iter()
-        .rev()
-        .take((sections[0].height.saturating_sub(2)) as usize)
-        .map(|line| ListItem::new(line.clone()))
-        .collect::<Vec<_>>();
-
-    let packets = state
-        .packet_log
-        .iter()
-        .rev()
-        .take((sections[1].height.saturating_sub(2)) as usize)
-        .map(|frame_data| {
-            let summary = format!(
-                "{} {} {} bytes",
-                frame_data.direction,
-                frame_data.timestamp,
-                frame_data.raw.len()
-            );
-            ListItem::new(summary)
-        })
-        .collect::<Vec<_>>();
-
-    frame.render_widget(List::new(events).block(themed_block("Event Log")), sections[0]);
-    frame.render_widget(List::new(packets).block(themed_block("Recent Packets")), sections[1]);
 }
 
 fn render_apply_modal(frame: &mut Frame, state: &AppState) {
@@ -645,37 +592,30 @@ fn render_color_bank(
     area: Rect,
     title: &str,
     buffer: Option<&[u8]>,
-    device_buffer: Option<&[u8]>,
+    _device_buffer: Option<&[u8]>,
     bank: usize,
-    target: ColorTarget,
-    state: &AppState,
+    _target: ColorTarget,
+    _state: &AppState,
 ) {
     let Some(buffer) = buffer else {
-        frame.render_widget(
-            Paragraph::new("Buffer pending.")
-                .block(themed_block(title))
-                .wrap(Wrap { trim: true }),
-            area,
-        );
+        render_text_section(frame, area, title, vec![Line::from("Buffer pending.")], true, false);
         return;
     };
 
-    let lines = (0..8)
+    let mut lines = vec![
+        Line::from(Span::styled(
+            title.to_string(),
+            theme::accent().add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+    lines.extend((0..8)
         .map(|row| {
             let spans = (0..8)
                 .flat_map(|col| {
                     let image_index = bank * 64 + row * 8 + col;
                     let button_index = MF64_IMAGE_TO_BUTTON_ID[image_index];
                     let color = color_for_button(buffer, button_index);
-                    let is_marked =
-                        target == state.selected_color_target
-                            && state.selected_pad_buttons.contains(&button_index);
-                    let is_selected =
-                        button_index == state.selected_pad_button_idx && target == state.selected_color_target;
-                    let is_dirty = buffer
-                        .get(button_index * 3..button_index * 3 + 3)
-                        != device_buffer.and_then(|bytes| bytes.get(button_index * 3..button_index * 3 + 3));
-                    let color = decorate_color(color, is_selected, is_marked, is_dirty);
                     [
                         Span::styled(
                             "   ",
@@ -687,14 +627,9 @@ fn render_color_bank(
                 .collect::<Vec<_>>();
             Line::from(spans)
         })
-        .collect::<Vec<_>>();
+        .collect::<Vec<_>>());
 
-    frame.render_widget(
-        Paragraph::new(lines)
-            .block(themed_block(title))
-            .wrap(Wrap { trim: false }),
-        area,
-    );
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
 }
 
 fn color_for_button(buffer: &[u8], button_index: usize) -> Color {
@@ -713,28 +648,6 @@ fn rgb_for_button(buffer: Option<&[u8]>, button_index: usize) -> (u8, u8, u8) {
         rgb[1].saturating_mul(2),
         rgb[2].saturating_mul(2),
     )
-}
-
-fn decorate_color(color: Color, is_selected: bool, is_marked: bool, is_dirty: bool) -> Color {
-    match color {
-        Color::Rgb(r, g, b) => {
-            let boost = if is_selected {
-                64
-            } else if is_marked {
-                32
-            } else if is_dirty {
-                16
-            } else {
-                0
-            };
-            Color::Rgb(
-                r.saturating_add(boost),
-                g.saturating_add(boost),
-                b.saturating_add(boost),
-            )
-        }
-        other => other,
-    }
 }
 
 fn selected_pad_summary(state: &AppState) -> String {
@@ -797,6 +710,33 @@ fn themed_block<'a>(title: &'a str) -> Block<'a> {
         .title(title)
         .borders(Borders::ALL)
         .border_style(theme::border())
+}
+
+fn render_text_section(
+    frame: &mut Frame,
+    area: Rect,
+    title: &str,
+    lines: Vec<Line<'static>>,
+    trim: bool,
+    bordered: bool,
+) {
+    let paragraph = if bordered {
+        Paragraph::new(lines)
+            .block(themed_block(title))
+            .wrap(Wrap { trim })
+    } else {
+        let mut body = vec![
+            Line::from(Span::styled(
+                title.to_string(),
+                theme::accent().add_modifier(Modifier::BOLD),
+            )),
+            Line::from(""),
+        ];
+        body.extend(lines);
+        Paragraph::new(body).wrap(Wrap { trim })
+    };
+
+    frame.render_widget(paragraph, area);
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {

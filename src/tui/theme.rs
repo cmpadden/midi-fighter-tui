@@ -17,6 +17,17 @@ pub fn selected() -> Style {
         .add_modifier(Modifier::BOLD)
 }
 
+pub fn footer() -> Style {
+    Style::default().fg(Color::Black).bg(Color::Cyan)
+}
+
+pub fn footer_label() -> Style {
+    Style::default()
+        .fg(Color::Black)
+        .bg(Color::Cyan)
+        .add_modifier(Modifier::BOLD)
+}
+
 #[allow(dead_code)]
 pub fn confidence(confidence: Confidence) -> Style {
     match confidence {

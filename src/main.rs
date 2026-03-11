@@ -59,7 +59,7 @@ fn run_app(
         if event::poll(Duration::from_millis(125))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    if let Some(action) = map_key(key, &app.state.screen, app.state.apply_modal_open) {
+                    if let Some(action) = map_key(key, &app.state) {
                         app.dispatch(action);
                     }
                 }
@@ -72,34 +72,42 @@ fn run_app(
     Ok(())
 }
 
-fn map_key(key: KeyEvent, screen: &Screen, apply_modal_open: bool) -> Option<Action> {
+fn map_key(key: KeyEvent, state: &app::AppState) -> Option<Action> {
     if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
         return Some(Action::Quit);
+    }
+
+    if state.help_modal_open {
+        return match key.code {
+            KeyCode::Esc | KeyCode::Char('?') => Some(Action::CancelModal),
+            KeyCode::Char('q') => Some(Action::Quit),
+            _ => None,
+        };
     }
 
     match key.code {
         KeyCode::Char('q') => Some(Action::Quit),
         KeyCode::Tab => Some(Action::NextScreen),
         KeyCode::BackTab => Some(Action::PrevScreen),
-        KeyCode::Left if matches!(screen, Screen::PadColors) => Some(Action::MoveLeft),
-        KeyCode::Right if matches!(screen, Screen::PadColors) => Some(Action::MoveRight),
+        KeyCode::Left if matches!(state.screen, Screen::PadColors) => Some(Action::MoveLeft),
+        KeyCode::Right if matches!(state.screen, Screen::PadColors) => Some(Action::MoveRight),
         KeyCode::Up => Some(Action::MoveUp),
         KeyCode::Down => Some(Action::MoveDown),
         KeyCode::Left => Some(Action::AdjustSelected(-1)),
         KeyCode::Right => Some(Action::AdjustSelected(1)),
         KeyCode::Enter => {
-            if apply_modal_open {
+            if state.apply_modal_open {
                 Some(Action::ConfirmApply)
-            } else if matches!(screen, Screen::Devices) {
+            } else if matches!(state.screen, Screen::Devices) {
                 Some(Action::ConnectSelected)
             } else {
                 Some(Action::ActivateSelected)
             }
         }
         KeyCode::Char(' ') => {
-            if apply_modal_open {
+            if state.apply_modal_open {
                 Some(Action::ConfirmApply)
-            } else if matches!(screen, Screen::PadColors) {
+            } else if matches!(state.screen, Screen::PadColors) {
                 Some(Action::TogglePadSelection)
             } else {
                 Some(Action::ActivateSelected)
@@ -109,11 +117,11 @@ fn map_key(key: KeyEvent, screen: &Screen, apply_modal_open: bool) -> Option<Act
         KeyCode::Char('r') => Some(Action::RefreshDevices),
         KeyCode::Char('g') => Some(Action::RefreshConfig),
         KeyCode::Char('d') => Some(Action::Disconnect),
-        KeyCode::Char('p') => Some(Action::TogglePacketPane),
+        KeyCode::Char('p') => Some(Action::ShowPacketLog),
         KeyCode::Char('a') => Some(Action::ToggleApplyModal),
-        KeyCode::Char('[') if matches!(screen, Screen::PadColors) => Some(Action::AdjustSelected(-1)),
-        KeyCode::Char(']') if matches!(screen, Screen::PadColors) => Some(Action::AdjustSelected(1)),
-        KeyCode::Char('x') if matches!(screen, Screen::PadColors) => Some(Action::ClearPadSelection),
+        KeyCode::Char('[') if matches!(state.screen, Screen::PadColors) => Some(Action::AdjustSelected(-1)),
+        KeyCode::Char(']') if matches!(state.screen, Screen::PadColors) => Some(Action::AdjustSelected(1)),
+        KeyCode::Char('x') if matches!(state.screen, Screen::PadColors) => Some(Action::ClearPadSelection),
         KeyCode::Char('u') => Some(Action::UndoField),
         KeyCode::Char('U') => Some(Action::DiscardAll),
         KeyCode::Char('?') => Some(Action::ShowHelp),
