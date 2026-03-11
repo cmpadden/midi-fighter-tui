@@ -83,7 +83,6 @@ fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
         Screen::Settings => render_settings_screen(frame, area, state),
         Screen::PadColors => render_pad_colors_screen(frame, area, state),
         Screen::PacketLog => render_packet_log_screen(frame, area, state),
-        Screen::ImportExport => render_import_export_screen(frame, area, state),
     }
 }
 
@@ -401,24 +400,6 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     render_text_section(frame, sections[1], "Packet Detail", detail, false, false);
 
     render_list_section(frame, sections[2], "Activity", events);
-}
-
-fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) {
-    let snapshot_status = state
-        .snapshot
-        .as_ref()
-        .map(|snapshot| format!("Loaded snapshot for {}", snapshot.family))
-        .unwrap_or_else(|| "No snapshot loaded.".into());
-
-    let body = vec![
-        Line::from(snapshot_status),
-        Line::from(""),
-        Line::from("Settings export is disabled right now."),
-        Line::from("Live tagged config read is now the source of truth for supported device settings."),
-        Line::from("The remaining work is implementing a real file export/import format for decoded snapshots."),
-    ];
-
-    render_text_section(frame, area, "Import / Export", body, true, false);
 }
 
 fn render_help_modal(frame: &mut Frame) {

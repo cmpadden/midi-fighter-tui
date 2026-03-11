@@ -75,7 +75,6 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::Settings => state.known_fields().len(),
         Screen::PadColors => 0,
         Screen::PacketLog => state.packet_log.len(),
-        Screen::ImportExport => 0,
     };
 
     let target = match state.screen {
@@ -83,7 +82,6 @@ fn move_selection(state: &mut AppState, delta: isize) {
         Screen::Settings => &mut state.selected_setting_idx,
         Screen::PadColors => return,
         Screen::PacketLog => &mut state.selected_packet_idx,
-        Screen::ImportExport => return,
     };
 
     if max == 0 {

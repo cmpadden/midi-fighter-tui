@@ -75,16 +75,14 @@ pub enum Screen {
     Settings,
     PadColors,
     PacketLog,
-    ImportExport,
 }
 
 impl Screen {
-    pub const ALL: [Screen; 5] = [
+    pub const ALL: [Screen; 4] = [
         Screen::Devices,
         Screen::Settings,
         Screen::PadColors,
         Screen::PacketLog,
-        Screen::ImportExport,
     ];
 
     pub fn title(self) -> &'static str {
@@ -93,7 +91,6 @@ impl Screen {
             Screen::Settings => "Settings",
             Screen::PadColors => "Pad Colors",
             Screen::PacketLog => "Activity Log",
-            Screen::ImportExport => "Import/Export",
         }
     }
 
