@@ -128,6 +128,9 @@ fn map_key(key: KeyEvent, state: &app::AppState) -> Option<Action> {
         KeyCode::Char('x') if matches!(state.screen, Screen::PadColors) => {
             Some(Action::ClearPadSelection)
         }
+        KeyCode::Char('b') if matches!(state.screen, Screen::PadColors) => {
+            Some(Action::TogglePadBank)
+        }
         KeyCode::Char('u') => Some(Action::UndoField),
         KeyCode::Char('U') => Some(Action::DiscardAll),
         KeyCode::Char('?') => Some(Action::ShowHelp),

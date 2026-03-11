@@ -19,6 +19,7 @@ pub enum Action {
     ConfirmApply,
     CancelModal,
     TogglePadSelection,
+    TogglePadBank,
     ClearPadSelection,
     UndoField,
     DiscardAll,

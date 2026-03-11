@@ -85,6 +85,27 @@ pub fn pad_color_tags(family: &DeviceFamily) -> Option<(u8, u8)> {
     }
 }
 
+pub fn bank_switch_message(
+    family: &DeviceFamily,
+    midi_channel: u8,
+    bank: usize,
+) -> Result<Vec<u8>, ProtocolError> {
+    match family {
+        DeviceFamily::MidiFighter64 if bank < 2 => {
+            Ok(vec![0xB0 | (midi_channel & 0x0F), 0x03, bank as u8])
+        }
+        DeviceFamily::MidiFighter64 => Err(ProtocolError::Unsupported(format!(
+            "Pad color bank {bank} is not supported for Midi Fighter 64."
+        ))),
+        DeviceFamily::Unknown(name) => Err(ProtocolError::Unsupported(format!(
+            "Bank switching is not enabled for unknown device family {name}."
+        ))),
+        _ => Err(ProtocolError::Unsupported(format!(
+            "Bank switching is not enabled for device family {family}."
+        ))),
+    }
+}
+
 pub fn build_write_messages(
     _snapshot: &ConfigSnapshot,
     _edits: &BTreeMap<String, FieldValue>,

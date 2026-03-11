@@ -1,8 +1,8 @@
 use crate::{
     protocol::{
-        apply_frame_to_snapshot, build_bulk_write_messages, build_write_messages,
-        bulk_read_request, config_read_request, decode_bulk_transfer_chunk, device_inquiry_request,
-        empty_snapshot, pad_color_tags, ReadCompleteness,
+        apply_frame_to_snapshot, bank_switch_message, build_bulk_write_messages,
+        build_write_messages, bulk_read_request, config_read_request, decode_bulk_transfer_chunk,
+        device_inquiry_request, empty_snapshot, pad_color_tags, FieldValue, ReadCompleteness,
     },
     transport::{MidiTransport, TransportError},
 };
@@ -123,6 +123,7 @@ pub fn connect_selected<T: MidiTransport>(
     state.snapshot = Some(empty_snapshot(device.family.clone()));
     state.pad_colors = None;
     state.staged_pad_colors = None;
+    state.selected_pad_bank = 0;
     state.selected_pad_button_idx = 0;
     state.selected_pad_buttons.clear();
     state.pending_bulk_reads.clear();
@@ -185,6 +186,8 @@ pub fn disconnect<T: MidiTransport>(
     state.snapshot = None;
     state.pad_colors = None;
     state.staged_pad_colors = None;
+    state.selected_pad_bank = 0;
+    state.selected_pad_button_idx = 0;
     state.selected_pad_buttons.clear();
     state.pending_bulk_reads.clear();
     state.pad_color_reads_requested = false;
@@ -212,6 +215,8 @@ pub fn refresh_config<T: MidiTransport>(
     state.set_status(format!("Refreshing config from {}...", device.name));
     state.pad_colors = None;
     state.staged_pad_colors = None;
+    state.selected_pad_bank = 0;
+    state.selected_pad_button_idx = 0;
     state.selected_pad_buttons.clear();
     state.pending_bulk_reads.clear();
     state.pad_color_reads_requested = false;
@@ -453,4 +458,48 @@ fn maybe_report_loaded_pad_colors(state: &mut AppState) {
     } else if pad_colors.loaded_buffers() == 1 {
         state.set_status("Loaded one pad color buffer; waiting for the second buffer.");
     }
+}
+
+pub fn notify_pad_bank_changed<T: MidiTransport>(
+    state: &mut AppState,
+    transport: &mut T,
+) -> Result<(), TransportError> {
+    let Some(snapshot) = state.snapshot.as_ref() else {
+        return Ok(());
+    };
+
+    let midi_channel_ui = snapshot
+        .fields
+        .iter()
+        .find(|field| field.id == "midi_channel")
+        .and_then(|field| match field.value {
+            FieldValue::Integer(value) => Some(value as u8),
+            _ => None,
+        })
+        .unwrap_or(1);
+    let midi_channel = midi_channel_ui.saturating_sub(1);
+
+    let message = match bank_switch_message(&snapshot.family, midi_channel, state.selected_pad_bank)
+    {
+        Ok(message) => message,
+        Err(err) => {
+            state.push_event(format!("Pad bank switch unavailable: {err}"));
+            return Ok(());
+        }
+    };
+
+    let frame = transport.send(&message)?;
+    state.packet_log.push(frame);
+    state.set_status(format!(
+        "Switched to pad color bank {} and sent device bank-change message.",
+        state.selected_pad_bank + 1
+    ));
+    state.push_event(format!(
+        "Sent bank-change message for bank {} on MIDI channel {} (wire {}).",
+        state.selected_pad_bank + 1,
+        midi_channel_ui,
+        midi_channel
+    ));
+
+    Ok(())
 }

@@ -54,6 +54,14 @@ impl<T: MidiTransport> App<T> {
                     self.state.mark_error(err.to_string());
                 }
             }
+            Action::TogglePadBank => {
+                reducer::reduce(&mut self.state, Action::TogglePadBank);
+                if let Err(err) =
+                    commands::notify_pad_bank_changed(&mut self.state, &mut self.transport)
+                {
+                    self.state.mark_error(err.to_string());
+                }
+            }
             other => reducer::reduce(&mut self.state, other),
         }
     }

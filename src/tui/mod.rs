@@ -42,7 +42,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|device| device.name.as_str())
         .unwrap_or("none");
     let key_hint = if matches!(state.screen, Screen::PadColors) {
-        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <arrows> move <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <arrows> move <b> bank <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
     } else {
         "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <up/down> move <left/right> edit <enter> select <a> apply"
     };
@@ -259,7 +259,7 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .iter()
         .position(|button| *button == state.selected_pad_button_idx)
         .unwrap_or(0);
-    let selected_bank = if selected_image_index >= 64 { 2 } else { 1 };
+    let selected_bank = state.selected_pad_bank + 1;
     let selected_pad_in_bank = selected_image_index % 64;
     let selected_rgb = match state.selected_color_target {
         ColorTarget::Inactive => rgb_for_button(
@@ -288,8 +288,8 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             }
         )),
         Line::from(format!(
-            "Selected pad: {} (bank {}, slot {})",
-            state.selected_pad_button_idx, selected_bank, selected_pad_in_bank
+            "Bank: {}    Selected pad: {} (slot {})",
+            selected_bank, state.selected_pad_button_idx, selected_pad_in_bank
         )),
         Line::from(format!(
             "Target: {}    Color: #{:02X}{:02X}{:02X}    Dirty pads: {}    Selection: {}",
@@ -308,52 +308,24 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .direction(LayoutDirection::Horizontal)
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(sections[1]);
-    let inactive = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(grids[0]);
-    let active = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
-        .split(grids[1]);
 
     render_color_bank(
         frame,
-        inactive[0],
-        "Inactive Colors Bank 1",
+        grids[0],
+        &format!("Inactive Colors Bank {}", selected_bank),
         pad_colors.inactive.as_deref(),
         device_pad_colors.inactive.as_deref(),
-        0,
+        state.selected_pad_bank,
         ColorTarget::Inactive,
         state,
     );
     render_color_bank(
         frame,
-        inactive[1],
-        "Inactive Colors Bank 2",
-        pad_colors.inactive.as_deref(),
-        device_pad_colors.inactive.as_deref(),
-        1,
-        ColorTarget::Inactive,
-        state,
-    );
-    render_color_bank(
-        frame,
-        active[0],
-        "Active Colors Bank 1",
+        grids[1],
+        &format!("Active Colors Bank {}", selected_bank),
         pad_colors.active.as_deref(),
         device_pad_colors.active.as_deref(),
-        0,
-        ColorTarget::Active,
-        state,
-    );
-    render_color_bank(
-        frame,
-        active[1],
-        "Active Colors Bank 2",
-        pad_colors.active.as_deref(),
-        device_pad_colors.active.as_deref(),
-        1,
+        state.selected_pad_bank,
         ColorTarget::Active,
         state,
     );
@@ -471,7 +443,8 @@ fn render_help_modal(frame: &mut Frame) {
         Line::from("  a           open apply preview"),
         Line::from(""),
         Line::from("Pad color workflow"),
-        Line::from("  Arrow keys  move the pad cursor across the 8x16 grid"),
+        Line::from("  Arrow keys  move the pad cursor across the active 8x8 bank"),
+        Line::from("  b           toggle between bank 1 and bank 2"),
         Line::from("  Space       toggle the current pad into the active selection"),
         Line::from("  x           clear the active pad selection"),
         Line::from("  [ / ]       cycle the palette for the current selection"),
