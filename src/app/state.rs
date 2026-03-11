@@ -92,7 +92,7 @@ impl Screen {
             Screen::Devices => "Devices",
             Screen::Settings => "Settings",
             Screen::PadColors => "Pad Colors",
-            Screen::PacketLog => "Packet Log",
+            Screen::PacketLog => "Activity Log",
             Screen::ImportExport => "Import/Export",
         }
     }

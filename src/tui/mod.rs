@@ -42,9 +42,9 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
         .map(|device| device.name.as_str())
         .unwrap_or("none");
     let key_hint = if matches!(state.screen, Screen::PadColors) {
-        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <arrows> move <b> bank <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> activity <?> help <arrows> move <b> bank <space> mark <enter> layer <[ ]> palette <x> clear <u> undo <a> apply"
     } else {
-        "<tab> sections <q> quit <r> scan <g> read <p> packet <?> help <up/down> move <left/right> edit <enter> select <a> apply"
+        "<tab> sections <q> quit <r> scan <g> read <p> activity <?> help <up/down> move <left/right> edit <enter> select <a> apply"
     };
 
     let lines = vec![
@@ -95,11 +95,6 @@ fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
-    let sections = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Length(8), Constraint::Min(0)])
-        .split(area);
-
     let device_items = if state.devices.is_empty() {
         vec![ListItem::new(
             "No Midi Fighter ports found. Press r to scan again.",
@@ -128,10 +123,18 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(
-        List::new(device_items).block(themed_block("Detected Devices")),
-        sections[0],
-    );
+    let max_list_height = area.height.saturating_sub(8).max(3);
+    let list_height = (device_items.len() as u16 + 2).max(3).min(max_list_height);
+    let sections = Layout::default()
+        .direction(LayoutDirection::Vertical)
+        .constraints([
+            Constraint::Length(list_height),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(area);
+
+    render_list_section(frame, sections[0], "Detected Devices", device_items);
 
     let detail_lines = if let Some(device) = state.selected_device() {
         vec![
@@ -162,20 +165,15 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
 
     render_text_section(
         frame,
-        sections[1],
+        sections[2],
         "Device Detail",
         detail_lines,
         true,
-        true,
+        false,
     );
 }
 
 fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
-    let sections = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(12)])
-        .split(area);
-
     let known_fields = state.known_fields();
     let items = if known_fields.is_empty() {
         vec![ListItem::new(
@@ -205,10 +203,18 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(
-        List::new(items).block(themed_block("Known Settings")),
-        sections[0],
-    );
+    let max_list_height = area.height.saturating_sub(8).max(3);
+    let list_height = (items.len() as u16 + 2).max(3).min(max_list_height);
+    let sections = Layout::default()
+        .direction(LayoutDirection::Vertical)
+        .constraints([
+            Constraint::Length(list_height),
+            Constraint::Length(1),
+            Constraint::Min(0),
+        ])
+        .split(area);
+
+    render_list_section(frame, sections[0], "Known Settings", items);
 
     let detail = if let Some(field) = state.selected_known_field() {
         let current = state.current_value_for(field);
@@ -218,18 +224,20 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             Line::from("Waiting for a tagged config reply from the device."),
             Line::from(""),
             Line::from("The TUI has already sent the vendor config-read request."),
-            Line::from("If nothing appears, press g to retry and watch Packet Log for replies."),
+            Line::from("If nothing appears, press g to retry and watch Activity Log for replies."),
         ]
     } else {
         vec![
             Line::from("No tagged settings decoded yet."),
             Line::from(""),
             Line::from("Connect a supported device and press g to request the current config."),
-            Line::from("Packet Log still shows the raw SysEx frames used to populate this screen."),
+            Line::from(
+                "Activity Log still shows the raw SysEx frames used to populate this screen.",
+            ),
         ]
     };
 
-    render_text_section(frame, sections[1], "Setting Detail", detail, true, true);
+    render_text_section(frame, sections[2], "Setting Detail", detail, true, false);
 }
 
 fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -240,12 +248,7 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             Line::from("MF64 color buffers are requested automatically after the base config snapshot completes."),
             Line::from("If needed, reconnect the device or press g to reread config."),
         ];
-        frame.render_widget(
-            Paragraph::new(body)
-                .block(themed_block("Pad Colors"))
-                .wrap(Wrap { trim: true }),
-            area,
-        );
+        render_text_section(frame, area, "Pad Colors", body, true, false);
         return;
     };
 
@@ -332,15 +335,6 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
 }
 
 fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
-    let sections = Layout::default()
-        .direction(LayoutDirection::Vertical)
-        .constraints([
-            Constraint::Min(8),
-            Constraint::Length(12),
-            Constraint::Length(8),
-        ])
-        .split(area);
-
     let items = if state.packet_log.is_empty() {
         vec![ListItem::new("No packets captured yet.")]
     } else {
@@ -371,15 +365,15 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(List::new(items).block(themed_block("Packets")), sections[0]);
-
-    let detail = state
-        .packet_log
-        .get(state.selected_packet_idx)
-        .map(packet_detail_lines)
-        .unwrap_or_else(|| vec![Line::from("No packet detail available.")]);
-
-    render_text_section(frame, sections[1], "Packet Detail", detail, false, true);
+    let min_detail_height = 8;
+    let min_activity_height = 4;
+    let max_packet_list_height = area
+        .height
+        .saturating_sub(min_detail_height + min_activity_height)
+        .max(4);
+    let packet_list_height = (items.len() as u16 + 2)
+        .max(4)
+        .min(max_packet_list_height);
 
     let events = if state.event_log.is_empty() {
         vec![ListItem::new("No activity recorded yet.")]
@@ -388,14 +382,38 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .event_log
             .iter()
             .rev()
-            .take((sections[2].height.saturating_sub(2)) as usize)
+            .take(8)
             .map(|line| ListItem::new(line.clone()))
             .collect::<Vec<_>>()
     };
-    frame.render_widget(
-        List::new(events).block(themed_block("Activity")),
-        sections[2],
-    );
+    let max_activity_height = area
+        .height
+        .saturating_sub(packet_list_height + min_detail_height)
+        .max(min_activity_height);
+    let activity_height = (events.len() as u16 + 2)
+        .max(min_activity_height)
+        .min(10)
+        .min(max_activity_height);
+    let sections = Layout::default()
+        .direction(LayoutDirection::Vertical)
+        .constraints([
+            Constraint::Length(packet_list_height),
+            Constraint::Min(0),
+            Constraint::Length(activity_height),
+        ])
+        .split(area);
+
+    render_list_section(frame, sections[0], "Packets", items);
+
+    let detail = state
+        .packet_log
+        .get(state.selected_packet_idx)
+        .map(packet_detail_lines)
+        .unwrap_or_else(|| vec![Line::from("No packet detail available.")]);
+
+    render_text_section(frame, sections[1], "Packet Detail", detail, false, false);
+
+    render_list_section(frame, sections[2], "Activity", events);
 }
 
 fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -413,7 +431,7 @@ fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) 
         Line::from("The remaining work is implementing a real file export/import format for decoded snapshots."),
     ];
 
-    render_text_section(frame, area, "Import / Export", body, true, true);
+    render_text_section(frame, area, "Import / Export", body, true, false);
 }
 
 fn render_help_modal(frame: &mut Frame) {
@@ -425,7 +443,7 @@ fn render_help_modal(frame: &mut Frame) {
         Line::from("  q / Ctrl-C  quit"),
         Line::from("  Tab         next section"),
         Line::from("  Shift-Tab   previous section"),
-        Line::from("  p           jump to Packet Log"),
+        Line::from("  p           jump to Activity Log"),
         Line::from("  ? / Esc     close help"),
         Line::from(""),
         Line::from("Device workflow"),
@@ -598,13 +616,10 @@ fn render_color_bank(
         return;
     };
 
-    let mut lines = vec![
-        Line::from(Span::styled(
-            title.to_string(),
-            theme::accent().add_modifier(Modifier::BOLD),
-        )),
-        Line::from(""),
-    ];
+    let mut lines = vec![Line::from(Span::styled(
+        title.to_string(),
+        theme::accent().add_modifier(Modifier::BOLD),
+    ))];
     lines.extend(
         (0..8)
             .map(|row| {
@@ -753,6 +768,22 @@ fn render_text_section(
     };
 
     frame.render_widget(paragraph, area);
+}
+
+fn render_list_section(frame: &mut Frame, area: Rect, title: &str, items: Vec<ListItem<'static>>) {
+    let sections = Layout::default()
+        .direction(LayoutDirection::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(0)])
+        .split(area);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            title.to_string(),
+            theme::accent().add_modifier(Modifier::BOLD),
+        ))),
+        sections[0],
+    );
+    frame.render_widget(List::new(items), sections[1]);
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
