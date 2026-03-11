@@ -19,6 +19,7 @@ use crate::{
 pub fn render(frame: &mut Frame, state: &AppState) {
     let areas = layout::split(frame.area());
     render_tabs(frame, areas.tabs, state);
+    render_separator(frame, areas.separator);
     render_status(frame, areas.status, state);
     render_main(frame, areas.main, state);
 
@@ -62,7 +63,7 @@ fn render_status(frame: &mut Frame, area: Rect, state: &AppState) {
 fn render_tabs(frame: &mut Frame, area: Rect, state: &AppState) {
     let titles = Screen::ALL
         .iter()
-        .map(|screen| Line::from(screen.title()))
+        .map(|screen| Line::from(format!(" {} ", screen.title())))
         .collect::<Vec<_>>();
     let selected = Screen::ALL
         .iter()
@@ -71,10 +72,21 @@ fn render_tabs(frame: &mut Frame, area: Rect, state: &AppState) {
 
     let tabs = Tabs::new(titles)
         .select(selected)
+        .style(theme::border())
         .highlight_style(theme::selected())
-        .divider(" ")
-        .block(themed_block("Sections"));
+        .divider("");
     frame.render_widget(tabs, area);
+}
+
+fn render_separator(frame: &mut Frame, area: Rect) {
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+
+    frame.render_widget(
+        Paragraph::new("─".repeat(area.width as usize)).style(theme::border()),
+        area,
+    );
 }
 
 fn render_main(frame: &mut Frame, area: Rect, state: &AppState) {
