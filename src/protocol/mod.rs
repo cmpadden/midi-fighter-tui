@@ -140,7 +140,10 @@ pub fn build_bulk_write_messages(
     }
 }
 
-pub fn apply_frame_to_snapshot(snapshot: &ConfigSnapshot, frame: &SysexFrame) -> Option<SnapshotUpdate> {
+pub fn apply_frame_to_snapshot(
+    snapshot: &ConfigSnapshot,
+    frame: &SysexFrame,
+) -> Option<SnapshotUpdate> {
     let tag_values = decode_tagged_config_response(&frame.raw)?;
 
     let mut fields_by_tag = snapshot
@@ -296,7 +299,10 @@ fn decode_bulk_transfer_chunk_raw(raw: &[u8]) -> Option<BulkTransferChunk> {
 }
 
 fn decode_field(family: DeviceFamily, tag: u8, value: u8) -> DecodedField {
-    if let Some(definition) = setting_definitions(&family).iter().find(|definition| definition.tag == tag) {
+    if let Some(definition) = setting_definitions(&family)
+        .iter()
+        .find(|definition| definition.tag == tag)
+    {
         return definition.decode(value);
     }
 
@@ -313,7 +319,9 @@ fn decode_field(family: DeviceFamily, tag: u8, value: u8) -> DecodedField {
         confidence: Confidence::ObservedOnly,
         editable: false,
         known: false,
-        notes: Some("Observed in a live tagged config reply; semantic meaning is still unknown.".into()),
+        notes: Some(
+            "Observed in a live tagged config reply; semantic meaning is still unknown.".into(),
+        ),
         source_bytes: vec![tag, value],
     }
 }
@@ -329,7 +337,9 @@ struct SettingDefinition {
 impl SettingDefinition {
     fn decode(&self, value: u8) -> DecodedField {
         let (field_value, kind) = match &self.kind {
-            DefinitionKind::Boolean => (FieldValue::Bool(value != 0), registry::SettingKind::Boolean),
+            DefinitionKind::Boolean => {
+                (FieldValue::Bool(value != 0), registry::SettingKind::Boolean)
+            }
             DefinitionKind::Integer { min, max, step } => (
                 FieldValue::Integer(value as i32),
                 registry::SettingKind::Integer {

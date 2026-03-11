@@ -1,8 +1,8 @@
 use crate::{
     protocol::{
-        apply_frame_to_snapshot, build_bulk_write_messages, build_write_messages, bulk_read_request,
-        config_read_request, decode_bulk_transfer_chunk, device_inquiry_request, empty_snapshot,
-        pad_color_tags, ReadCompleteness,
+        apply_frame_to_snapshot, build_bulk_write_messages, build_write_messages,
+        bulk_read_request, config_read_request, decode_bulk_transfer_chunk, device_inquiry_request,
+        empty_snapshot, pad_color_tags, ReadCompleteness,
     },
     transport::{MidiTransport, TransportError},
 };
@@ -56,14 +56,22 @@ pub fn refresh_devices<T: MidiTransport>(
         } else {
             AppMode::Idle
         };
-        state.set_status(format!("Found {} candidate device(s).", state.devices.len()));
-        state.push_event(format!("Scan completed: {} candidate device(s).", state.devices.len()));
+        state.set_status(format!(
+            "Found {} candidate device(s).",
+            state.devices.len()
+        ));
+        state.push_event(format!(
+            "Scan completed: {} candidate device(s).",
+            state.devices.len()
+        ));
     }
 
     Ok(())
 }
 
-fn scan_devices_with_retry<T: MidiTransport>(transport: &mut T) -> Result<Vec<crate::transport::DeviceRef>, TransportError> {
+fn scan_devices_with_retry<T: MidiTransport>(
+    transport: &mut T,
+) -> Result<Vec<crate::transport::DeviceRef>, TransportError> {
     const ATTEMPTS: usize = 4;
     const RETRY_DELAY_MS: u64 = 150;
 
@@ -87,7 +95,11 @@ fn restore_selected_device(state: &mut AppState, selected_id: Option<&str>) {
         return;
     };
 
-    if let Some(index) = state.devices.iter().position(|device| device.id == selected_id) {
+    if let Some(index) = state
+        .devices
+        .iter()
+        .position(|device| device.id == selected_id)
+    {
         state.selected_device_idx = index;
     }
 }
@@ -122,7 +134,10 @@ pub fn connect_selected<T: MidiTransport>(
     state.selected_packet_idx = 0;
     state.app_mode = AppMode::ReadingConfig;
     state.screen = Screen::Settings;
-    state.set_status(format!("Connected to {}. Requesting device settings...", device.name));
+    state.set_status(format!(
+        "Connected to {}. Requesting device settings...",
+        device.name
+    ));
     state.push_event(format!("Connected to {}.", device.name));
 
     if let Some(note) = note {
@@ -137,8 +152,14 @@ pub fn connect_selected<T: MidiTransport>(
         Ok(request) => {
             let sent = transport.send(&request)?;
             state.packet_log.push(sent);
-            state.push_event(format!("Sent tagged config read request to {}.", device.name));
-            state.set_status(format!("Waiting for tagged config reply from {}...", device.name));
+            state.push_event(format!(
+                "Sent tagged config read request to {}.",
+                device.name
+            ));
+            state.set_status(format!(
+                "Waiting for tagged config reply from {}...",
+                device.name
+            ));
         }
         Err(err) => {
             state.app_mode = AppMode::Connected;
@@ -150,7 +171,10 @@ pub fn connect_selected<T: MidiTransport>(
     Ok(())
 }
 
-pub fn disconnect<T: MidiTransport>(state: &mut AppState, transport: &mut T) -> Result<(), TransportError> {
+pub fn disconnect<T: MidiTransport>(
+    state: &mut AppState,
+    transport: &mut T,
+) -> Result<(), TransportError> {
     transport.disconnect()?;
 
     let disconnected = state
@@ -198,7 +222,10 @@ pub fn refresh_config<T: MidiTransport>(
             let sent = transport.send(&request)?;
             state.packet_log.push(sent);
             state.set_status("Sent config read request. Waiting for tagged device reply.");
-            state.push_event(format!("Sent tagged config read request to {}.", device.name));
+            state.push_event(format!(
+                "Sent tagged config read request to {}.",
+                device.name
+            ));
         }
         Err(err) => {
             state.app_mode = AppMode::Connected;
@@ -321,7 +348,9 @@ pub fn poll_transport<T: MidiTransport>(
 
         if let Some(chunk) = decode_bulk_transfer_chunk(frame) {
             let pending = state.pending_bulk_reads.entry(chunk.tag).or_default();
-            if let Some(buffer) = pending.push_chunk(chunk.chunk_index, chunk.total_chunks, chunk.data) {
+            if let Some(buffer) =
+                pending.push_chunk(chunk.chunk_index, chunk.total_chunks, chunk.data)
+            {
                 let pad_colors = state.pad_colors.get_or_insert_with(Default::default);
                 match chunk.tag {
                     1 => pad_colors.inactive = Some(buffer),

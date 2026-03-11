@@ -140,7 +140,10 @@ fn cycle_enum(options: &[String], current: &FieldValue, delta: i32) -> Option<Fi
         return None;
     };
 
-    let current_index = options.iter().position(|option| option == current).unwrap_or(0) as i32;
+    let current_index = options
+        .iter()
+        .position(|option| option == current)
+        .unwrap_or(0) as i32;
     let len = options.len() as i32;
     if len == 0 {
         return None;

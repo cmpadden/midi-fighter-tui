@@ -9,16 +9,18 @@ use ratatui::{
 
 use crate::{
     app::{AppState, ColorTarget, Screen},
-    protocol::{build_bulk_write_messages, build_write_messages, DecodedField, FieldValue, SysexFrame},
+    protocol::{
+        build_bulk_write_messages, build_write_messages, DecodedField, FieldValue, SysexFrame,
+    },
 };
 
 const MF64_IMAGE_TO_BUTTON_ID: [usize; 128] = [
-    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54,
-    55, 16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42,
-    43, 4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126,
-    127, 88, 89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83,
-    112, 113, 114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107,
-    68, 69, 70, 71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
+    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54, 55,
+    16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42, 43,
+    4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126, 127, 88,
+    89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83, 112, 113,
+    114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107, 68, 69, 70,
+    71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
 ];
 
 pub fn render(frame: &mut Frame, state: &AppState) {
@@ -96,9 +98,12 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         .split(area);
 
     let device_items = if state.devices.is_empty() {
-        vec![ListItem::new("No Midi Fighter ports found. Press r to scan again.")]
+        vec![ListItem::new(
+            "No Midi Fighter ports found. Press r to scan again.",
+        )]
     } else {
-        state.devices
+        state
+            .devices
             .iter()
             .enumerate()
             .map(|(index, device)| {
@@ -120,12 +125,18 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(List::new(device_items).block(themed_block("Detected Devices")), sections[0]);
+    frame.render_widget(
+        List::new(device_items).block(themed_block("Detected Devices")),
+        sections[0],
+    );
 
     let detail_lines = if let Some(device) = state.selected_device() {
         vec![
             Line::from(format!("Family: {}", device.family)),
-            Line::from(format!("Protocol confidence: {}", device.protocol_confidence)),
+            Line::from(format!(
+                "Protocol confidence: {}",
+                device.protocol_confidence
+            )),
             Line::from(format!(
                 "Input port: {}",
                 device.input_port.as_deref().unwrap_or("missing")
@@ -146,7 +157,14 @@ fn render_devices_screen(frame: &mut Frame, area: Rect, state: &AppState) {
         ]
     };
 
-    render_text_section(frame, sections[1], "Device Detail", detail_lines, true, true);
+    render_text_section(
+        frame,
+        sections[1],
+        "Device Detail",
+        detail_lines,
+        true,
+        true,
+    );
 }
 
 fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -157,7 +175,9 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
 
     let known_fields = state.known_fields();
     let items = if known_fields.is_empty() {
-        vec![ListItem::new("Connect a device to inspect supported settings.")]
+        vec![ListItem::new(
+            "Connect a device to inspect supported settings.",
+        )]
     } else {
         known_fields
             .iter()
@@ -182,7 +202,10 @@ fn render_settings_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(List::new(items).block(themed_block("Known Settings")), sections[0]);
+    frame.render_widget(
+        List::new(items).block(themed_block("Known Settings")),
+        sections[0],
+    );
 
     let detail = if let Some(field) = state.selected_known_field() {
         let current = state.current_value_for(field);
@@ -233,7 +256,10 @@ fn render_raw_tags_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             .collect()
     };
 
-    frame.render_widget(List::new(items).block(themed_block("Unknown Tags")), sections[0]);
+    frame.render_widget(
+        List::new(items).block(themed_block("Unknown Tags")),
+        sections[0],
+    );
 
     let detail = state
         .unknown_fields()
@@ -274,17 +300,30 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let selected_bank = if selected_image_index >= 64 { 2 } else { 1 };
     let selected_pad_in_bank = selected_image_index % 64;
     let selected_rgb = match state.selected_color_target {
-        ColorTarget::Inactive => rgb_for_button(pad_colors.inactive.as_deref(), state.selected_pad_button_idx),
-        ColorTarget::Active => rgb_for_button(pad_colors.active.as_deref(), state.selected_pad_button_idx),
+        ColorTarget::Inactive => rgb_for_button(
+            pad_colors.inactive.as_deref(),
+            state.selected_pad_button_idx,
+        ),
+        ColorTarget::Active => {
+            rgb_for_button(pad_colors.active.as_deref(), state.selected_pad_button_idx)
+        }
     };
     let summary = vec![
         Line::from(format!(
             "Inactive buffer: {}",
-            if pad_colors.inactive.is_some() { "loaded" } else { "pending" }
+            if pad_colors.inactive.is_some() {
+                "loaded"
+            } else {
+                "pending"
+            }
         )),
         Line::from(format!(
             "Active buffer: {}",
-            if pad_colors.active.is_some() { "loaded" } else { "pending" }
+            if pad_colors.active.is_some() {
+                "loaded"
+            } else {
+                "pending"
+            }
         )),
         Line::from(format!(
             "Selected pad: {} (bank {}, slot {})",
@@ -299,10 +338,7 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
             state.dirty_pad_color_count(),
             state.selected_pad_buttons.len()
         )),
-        Line::from(format!(
-            "Selection detail: {}",
-            selected_pad_summary(state)
-        )),
+        Line::from(format!("Selection detail: {}", selected_pad_summary(state))),
     ];
     render_text_section(frame, sections[0], "Pad Color Status", summary, true, false);
 
@@ -364,13 +400,18 @@ fn render_pad_colors_screen(frame: &mut Frame, area: Rect, state: &AppState) {
 fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let sections = Layout::default()
         .direction(LayoutDirection::Vertical)
-        .constraints([Constraint::Min(8), Constraint::Length(12), Constraint::Length(8)])
+        .constraints([
+            Constraint::Min(8),
+            Constraint::Length(12),
+            Constraint::Length(8),
+        ])
         .split(area);
 
     let items = if state.packet_log.is_empty() {
         vec![ListItem::new("No packets captured yet.")]
     } else {
-        state.packet_log
+        state
+            .packet_log
             .iter()
             .enumerate()
             .map(|(index, frame_data)| {
@@ -409,14 +450,18 @@ fn render_packet_log_screen(frame: &mut Frame, area: Rect, state: &AppState) {
     let events = if state.event_log.is_empty() {
         vec![ListItem::new("No activity recorded yet.")]
     } else {
-        state.event_log
+        state
+            .event_log
             .iter()
             .rev()
-        .take((sections[2].height.saturating_sub(2)) as usize)
-        .map(|line| ListItem::new(line.clone()))
-        .collect::<Vec<_>>()
+            .take((sections[2].height.saturating_sub(2)) as usize)
+            .map(|line| ListItem::new(line.clone()))
+            .collect::<Vec<_>>()
     };
-    frame.render_widget(List::new(events).block(themed_block("Activity")), sections[2]);
+    frame.render_widget(
+        List::new(events).block(themed_block("Activity")),
+        sections[2],
+    );
 }
 
 fn render_import_export_screen(frame: &mut Frame, area: Rect, state: &AppState) {
@@ -538,7 +583,11 @@ fn render_apply_modal(frame: &mut Frame, state: &AppState) {
     );
 }
 
-fn field_detail_lines(field: &DecodedField, current: &FieldValue, dirty: bool) -> Vec<Line<'static>> {
+fn field_detail_lines(
+    field: &DecodedField,
+    current: &FieldValue,
+    dirty: bool,
+) -> Vec<Line<'static>> {
     let mut lines = vec![
         Line::from(format!("Label: {}", field.label)),
         Line::from(format!("Field id: {}", field.id)),
@@ -546,7 +595,10 @@ fn field_detail_lines(field: &DecodedField, current: &FieldValue, dirty: bool) -
         Line::from(format!("Current value: {}", current)),
         Line::from(format!("Device value: {}", field.value)),
         Line::from(format!("Confidence: {}", field.confidence)),
-        Line::from(format!("Editable: {}", if field.editable { "yes" } else { "no" })),
+        Line::from(format!(
+            "Editable: {}",
+            if field.editable { "yes" } else { "no" }
+        )),
         Line::from(format!("Dirty: {}", if dirty { "yes" } else { "no" })),
         Line::from(format!("Source bytes: {}", hex_bytes(&field.source_bytes))),
     ];
@@ -581,7 +633,9 @@ fn packet_detail_lines(frame_data: &SysexFrame) -> Vec<Line<'static>> {
         }
     } else {
         lines.push(Line::from(""));
-        lines.push(Line::from("Raw MIDI message captured. Not a complete SysEx frame."));
+        lines.push(Line::from(
+            "Raw MIDI message captured. Not a complete SysEx frame.",
+        ));
     }
 
     lines
@@ -598,7 +652,14 @@ fn render_color_bank(
     state: &AppState,
 ) {
     let Some(buffer) = buffer else {
-        render_text_section(frame, area, title, vec![Line::from("Buffer pending.")], true, false);
+        render_text_section(
+            frame,
+            area,
+            title,
+            vec![Line::from("Buffer pending.")],
+            true,
+            false,
+        );
         return;
     };
 
@@ -609,33 +670,37 @@ fn render_color_bank(
         )),
         Line::from(""),
     ];
-    lines.extend((0..8)
-        .map(|row| {
-            let spans = (0..8)
-                .flat_map(|col| {
-                    let image_index = bank * 64 + row * 8 + col;
-                    let button_index = MF64_IMAGE_TO_BUTTON_ID[image_index];
-                    let color = color_for_button(buffer, button_index);
-                    let is_active_layer = state.selected_color_target == target;
-                    let is_cursor = is_active_layer && state.selected_pad_button_idx == button_index;
-                    let is_selected = is_active_layer && state.selected_pad_buttons.contains(&button_index);
-                    let marker_style = match (is_cursor, is_selected) {
-                        (true, true) => theme::selected(),
-                        (true, false) => theme::selected(),
-                        (false, true) => Style::default().bg(Color::Gray),
-                        (false, false) => Style::default(),
-                    };
-                    [
-                        Span::styled(" ", marker_style),
-                        Span::styled("   ", Style::default().bg(color)),
-                        Span::styled(" ", marker_style),
-                        Span::raw(" "),
-                    ]
-                })
-                .collect::<Vec<_>>();
-            Line::from(spans)
-        })
-        .collect::<Vec<_>>());
+    lines.extend(
+        (0..8)
+            .map(|row| {
+                let spans = (0..8)
+                    .flat_map(|col| {
+                        let image_index = bank * 64 + row * 8 + col;
+                        let button_index = MF64_IMAGE_TO_BUTTON_ID[image_index];
+                        let color = color_for_button(buffer, button_index);
+                        let is_active_layer = state.selected_color_target == target;
+                        let is_cursor =
+                            is_active_layer && state.selected_pad_button_idx == button_index;
+                        let is_selected =
+                            is_active_layer && state.selected_pad_buttons.contains(&button_index);
+                        let marker_style = match (is_cursor, is_selected) {
+                            (true, true) => theme::selected(),
+                            (true, false) => theme::selected(),
+                            (false, true) => Style::default().bg(Color::Gray),
+                            (false, false) => Style::default(),
+                        };
+                        [
+                            Span::styled(" ", marker_style),
+                            Span::styled("   ", Style::default().bg(color)),
+                            Span::styled(" ", marker_style),
+                            Span::raw(" "),
+                        ]
+                    })
+                    .collect::<Vec<_>>();
+                Line::from(spans)
+            })
+            .collect::<Vec<_>>(),
+    );
 
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), area);
 }
@@ -663,7 +728,11 @@ fn selected_pad_summary(state: &AppState) -> String {
         return "none; cursor only".into();
     }
 
-    let mut pads = state.selected_pad_buttons.iter().copied().collect::<Vec<_>>();
+    let mut pads = state
+        .selected_pad_buttons
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
     pads.sort_unstable();
 
     let summary = pads
@@ -679,7 +748,9 @@ fn selected_pad_summary(state: &AppState) -> String {
     }
 }
 
-fn preview_apply_frames(state: &AppState) -> Option<Result<Vec<Vec<u8>>, crate::protocol::ProtocolError>> {
+fn preview_apply_frames(
+    state: &AppState,
+) -> Option<Result<Vec<Vec<u8>>, crate::protocol::ProtocolError>> {
     let snapshot = state.snapshot.as_ref()?;
     let mut frames = Vec::new();
 
@@ -690,7 +761,9 @@ fn preview_apply_frames(state: &AppState) -> Option<Result<Vec<Vec<u8>>, crate::
         }
     }
 
-    if let (Some(device_colors), Some(staged_colors)) = (state.pad_colors.as_ref(), state.staged_pad_colors.as_ref()) {
+    if let (Some(device_colors), Some(staged_colors)) =
+        (state.pad_colors.as_ref(), state.staged_pad_colors.as_ref())
+    {
         let mut writes = Vec::new();
         if staged_colors.inactive != device_colors.inactive {
             if let Some(buffer) = staged_colors.inactive.as_deref() {
@@ -748,7 +821,8 @@ fn render_text_section(
 }
 
 fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter()
+    bytes
+        .iter()
         .map(|byte| format!("{byte:02X}"))
         .collect::<Vec<_>>()
         .join(" ")

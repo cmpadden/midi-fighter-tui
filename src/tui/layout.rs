@@ -1,6 +1,4 @@
-use ratatui::{
-    layout::{Constraint, Direction, Layout, Rect},
-};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
 pub struct UiLayout {
     pub tabs: Rect,

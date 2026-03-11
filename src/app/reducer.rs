@@ -3,12 +3,12 @@ use crate::protocol::{DecodedField, FieldValue};
 use super::{Action, AppMode, AppState, ColorTarget, Screen};
 
 const MF64_IMAGE_TO_BUTTON_ID: [usize; 128] = [
-    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54,
-    55, 16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42,
-    43, 4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126,
-    127, 88, 89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83,
-    112, 113, 114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107,
-    68, 69, 70, 71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
+    28, 29, 30, 31, 60, 61, 62, 63, 24, 25, 26, 27, 56, 57, 58, 59, 20, 21, 22, 23, 52, 53, 54, 55,
+    16, 17, 18, 19, 48, 49, 50, 51, 12, 13, 14, 15, 44, 45, 46, 47, 8, 9, 10, 11, 40, 41, 42, 43,
+    4, 5, 6, 7, 36, 37, 38, 39, 0, 1, 2, 3, 32, 33, 34, 35, 92, 93, 94, 95, 124, 125, 126, 127, 88,
+    89, 90, 91, 120, 121, 122, 123, 84, 85, 86, 87, 116, 117, 118, 119, 80, 81, 82, 83, 112, 113,
+    114, 115, 76, 77, 78, 79, 108, 109, 110, 111, 72, 73, 74, 75, 104, 105, 106, 107, 68, 69, 70,
+    71, 100, 101, 102, 103, 64, 65, 66, 67, 96, 97, 98, 99,
 ];
 
 pub fn reduce(state: &mut AppState, action: Action) {
@@ -150,7 +150,10 @@ where
 
     let current = state.current_value_for(&field);
     let Some(next_value) = change(&field, &current) else {
-        state.set_status(format!("{} cannot be adjusted from the TUI yet.", field.label));
+        state.set_status(format!(
+            "{} cannot be adjusted from the TUI yet.",
+            field.label
+        ));
         return;
     };
 
@@ -159,7 +162,9 @@ where
         state.set_status(format!("Reverted {} to device value.", field.label));
         state.push_event(format!("Reverted {}", field.label));
     } else {
-        state.staged_edits.insert(field.id.clone(), next_value.clone());
+        state
+            .staged_edits
+            .insert(field.id.clone(), next_value.clone());
         state.set_status(format!("Staged {} = {}", field.label, next_value));
         state.push_event(format!("staged {} = {}", field.id, next_value));
     }
@@ -231,12 +236,11 @@ fn stage_pad_color_adjustment(state: &mut AppState, delta: i32) {
         return;
     };
 
-    let current = (
-        current_bytes[0],
-        current_bytes[1],
-        current_bytes[2],
-    );
-    let current_index = PALETTE.iter().position(|entry| *entry == current).unwrap_or(0) as i32;
+    let current = (current_bytes[0], current_bytes[1], current_bytes[2]);
+    let current_index = PALETTE
+        .iter()
+        .position(|entry| *entry == current)
+        .unwrap_or(0) as i32;
     let next_index = (current_index + delta).rem_euclid(PALETTE.len() as i32) as usize;
     let next = PALETTE[next_index];
 
@@ -354,8 +358,13 @@ fn toggle_pad_selection(state: &mut AppState) {
         return;
     }
 
-    if !state.selected_pad_buttons.insert(state.selected_pad_button_idx) {
-        state.selected_pad_buttons.remove(&state.selected_pad_button_idx);
+    if !state
+        .selected_pad_buttons
+        .insert(state.selected_pad_button_idx)
+    {
+        state
+            .selected_pad_buttons
+            .remove(&state.selected_pad_button_idx);
     }
 
     state.set_status(format!(
@@ -396,7 +405,10 @@ fn move_pad_cursor(state: &mut AppState, dx: isize, dy: isize) {
 
 fn sync_mode(state: &mut AppState) {
     if state.connected_device_id.is_none() {
-        if !matches!(state.app_mode, AppMode::Scanning | AppMode::Error | AppMode::Booting) {
+        if !matches!(
+            state.app_mode,
+            AppMode::Scanning | AppMode::Error | AppMode::Booting
+        ) {
             state.app_mode = AppMode::Idle;
         }
         return;

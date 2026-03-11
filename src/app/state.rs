@@ -12,7 +12,12 @@ pub struct PendingBulkRead {
 }
 
 impl PendingBulkRead {
-    pub fn push_chunk(&mut self, chunk_index: u8, total_chunks: u8, data: Vec<u8>) -> Option<Vec<u8>> {
+    pub fn push_chunk(
+        &mut self,
+        chunk_index: u8,
+        total_chunks: u8,
+        data: Vec<u8>,
+    ) -> Option<Vec<u8>> {
         self.total_chunks = total_chunks;
         self.chunks.insert(chunk_index, data);
 
@@ -96,12 +101,18 @@ impl Screen {
     }
 
     pub fn next(self) -> Self {
-        let index = Self::ALL.iter().position(|screen| *screen == self).unwrap_or(0);
+        let index = Self::ALL
+            .iter()
+            .position(|screen| *screen == self)
+            .unwrap_or(0);
         Self::ALL[(index + 1) % Self::ALL.len()]
     }
 
     pub fn prev(self) -> Self {
-        let index = Self::ALL.iter().position(|screen| *screen == self).unwrap_or(0);
+        let index = Self::ALL
+            .iter()
+            .position(|screen| *screen == self)
+            .unwrap_or(0);
         Self::ALL[(index + Self::ALL.len() - 1) % Self::ALL.len()]
     }
 }
@@ -202,7 +213,9 @@ impl AppState {
 
     pub fn connected_device(&self) -> Option<&DeviceRef> {
         let connected_id = self.connected_device_id.as_ref()?;
-        self.devices.iter().find(|device| &device.id == connected_id)
+        self.devices
+            .iter()
+            .find(|device| &device.id == connected_id)
     }
 
     pub fn known_fields(&self) -> Vec<&DecodedField> {
@@ -215,7 +228,13 @@ impl AppState {
     pub fn unknown_fields(&self) -> Vec<&DecodedField> {
         self.snapshot
             .as_ref()
-            .map(|snapshot| snapshot.fields.iter().filter(|field| !field.known).collect())
+            .map(|snapshot| {
+                snapshot
+                    .fields
+                    .iter()
+                    .filter(|field| !field.known)
+                    .collect()
+            })
             .unwrap_or_default()
     }
 

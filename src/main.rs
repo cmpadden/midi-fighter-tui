@@ -119,9 +119,15 @@ fn map_key(key: KeyEvent, state: &app::AppState) -> Option<Action> {
         KeyCode::Char('d') => Some(Action::Disconnect),
         KeyCode::Char('p') => Some(Action::ShowPacketLog),
         KeyCode::Char('a') => Some(Action::ToggleApplyModal),
-        KeyCode::Char('[') if matches!(state.screen, Screen::PadColors) => Some(Action::AdjustSelected(-1)),
-        KeyCode::Char(']') if matches!(state.screen, Screen::PadColors) => Some(Action::AdjustSelected(1)),
-        KeyCode::Char('x') if matches!(state.screen, Screen::PadColors) => Some(Action::ClearPadSelection),
+        KeyCode::Char('[') if matches!(state.screen, Screen::PadColors) => {
+            Some(Action::AdjustSelected(-1))
+        }
+        KeyCode::Char(']') if matches!(state.screen, Screen::PadColors) => {
+            Some(Action::AdjustSelected(1))
+        }
+        KeyCode::Char('x') if matches!(state.screen, Screen::PadColors) => {
+            Some(Action::ClearPadSelection)
+        }
         KeyCode::Char('u') => Some(Action::UndoField),
         KeyCode::Char('U') => Some(Action::DiscardAll),
         KeyCode::Char('?') => Some(Action::ShowHelp),

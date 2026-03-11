@@ -33,11 +33,11 @@ impl MidirTransport {
 
 impl MidiTransport for MidirTransport {
     fn scan_devices(&mut self) -> Result<Vec<DeviceRef>, TransportError> {
-        let mut midi_input =
-            MidiInput::new("midi-fighter-tui-scan").map_err(|err| TransportError::Backend(err.to_string()))?;
+        let mut midi_input = MidiInput::new("midi-fighter-tui-scan")
+            .map_err(|err| TransportError::Backend(err.to_string()))?;
         midi_input.ignore(Ignore::None);
-        let midi_output =
-            MidiOutput::new("midi-fighter-tui-scan").map_err(|err| TransportError::Backend(err.to_string()))?;
+        let midi_output = MidiOutput::new("midi-fighter-tui-scan")
+            .map_err(|err| TransportError::Backend(err.to_string()))?;
 
         let inputs = collect_input_names(&midi_input);
         let outputs = collect_output_names(&midi_output);
@@ -79,11 +79,11 @@ impl MidiTransport for MidirTransport {
     fn connect(&mut self, device: &DeviceRef) -> Result<Option<String>, TransportError> {
         self.disconnect()?;
 
-        let mut midi_input =
-            MidiInput::new("midi-fighter-tui-live-in").map_err(|err| TransportError::Backend(err.to_string()))?;
+        let mut midi_input = MidiInput::new("midi-fighter-tui-live-in")
+            .map_err(|err| TransportError::Backend(err.to_string()))?;
         midi_input.ignore(Ignore::None);
-        let midi_output =
-            MidiOutput::new("midi-fighter-tui-live-out").map_err(|err| TransportError::Backend(err.to_string()))?;
+        let midi_output = MidiOutput::new("midi-fighter-tui-live-out")
+            .map_err(|err| TransportError::Backend(err.to_string()))?;
 
         let (sender, receiver) = mpsc::channel();
 
@@ -133,7 +133,8 @@ impl MidiTransport for MidirTransport {
         });
 
         Ok(Some(
-            "Connected to live MIDI ports. Packet log is now backed by real incoming traffic.".into(),
+            "Connected to live MIDI ports. Packet log is now backed by real incoming traffic."
+                .into(),
         ))
     }
 
@@ -208,11 +209,19 @@ fn slugify(name: &str) -> String {
         .collect()
 }
 
-fn find_input_port(midi_input: &MidiInput, port_name: &str) -> Result<midir::MidiInputPort, TransportError> {
+fn find_input_port(
+    midi_input: &MidiInput,
+    port_name: &str,
+) -> Result<midir::MidiInputPort, TransportError> {
     midi_input
         .ports()
         .into_iter()
-        .find(|port| midi_input.port_name(port).map(|name| name == port_name).unwrap_or(false))
+        .find(|port| {
+            midi_input
+                .port_name(port)
+                .map(|name| name == port_name)
+                .unwrap_or(false)
+        })
         .ok_or_else(|| TransportError::MissingPort(port_name.to_string()))
 }
 
@@ -223,7 +232,12 @@ fn find_output_port(
     midi_output
         .ports()
         .into_iter()
-        .find(|port| midi_output.port_name(port).map(|name| name == port_name).unwrap_or(false))
+        .find(|port| {
+            midi_output
+                .port_name(port)
+                .map(|name| name == port_name)
+                .unwrap_or(false)
+        })
         .ok_or_else(|| TransportError::MissingPort(port_name.to_string()))
 }
 
